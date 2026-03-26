@@ -1,0 +1,107 @@
+﻿@page
+@model LoginModel
+@{
+    ViewData["Title"] = "Đăng nhập hệ thống";
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Đăng nhập</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > Đăng nhập</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section contact-us">
+    <div class="container">
+        <div class="row justify-content-center">
+
+            <div class="col-lg-6">
+                <div class="contact-form" style="background-color: #f7f7f7; padding: 40px; border-radius: 25px; height: 100%;">
+                    <form id="account" method="post">
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="section-heading text-center mb-4">
+                                    <h6>CHÀO MỪNG TRỞ LẠI</h6>
+                                    <h2>Đăng nhập bằng tài khoản</h2>
+                                </div>
+                            </div>
+
+                            <div asp-validation-summary="ModelOnly" class="text-danger mb-3" role="alert"></div>
+
+                            <div class="col-lg-12 mb-3">
+                                <input asp-for="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="Địa chỉ Email..." style="border-radius: 20px; padding: 10px 20px;" required />
+                                <span asp-validation-for="Input.Email" class="text-danger" style="font-size: 13px;"></span>
+                            </div>
+
+                            <div class="col-lg-12 mb-3">
+                                <input asp-for="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="Mật khẩu..." style="border-radius: 20px; padding: 10px 20px;" required />
+                                <span asp-validation-for="Input.Password" class="text-danger" style="font-size: 13px;"></span>
+                            </div>
+
+                            <div class="col-lg-12 mb-4 d-flex justify-content-between align-items-center">
+                                <div class="form-check">
+                                    <input class="form-check-input" asp-for="Input.RememberMe" />
+                                    <label class="form-check-label text-muted" asp-for="Input.RememberMe" style="font-size: 14px;">Ghi nhớ mật khẩu</label>
+                                </div>
+                                <a id="forgot-password" asp-page="./ForgotPassword" style="color: #ee626b; font-size: 14px;">Quên mật khẩu?</a>
+                            </div>
+
+                            <div class="col-lg-12 text-center mb-3">
+                                <button id="login-submit" type="submit" class="btn w-100" style="background-color: #ee626b; color: #fff; border: none; padding: 12px; border-radius: 25px; font-weight: bold; text-transform: uppercase; transition: 0.3s;">Đăng nhập</button>
+                            </div>
+
+                            <div class="col-lg-12 text-center mt-3" style="font-size: 14px;">
+                                <p class="mb-1">
+                                    <span class="text-muted">Chưa có tài khoản?</span>
+                                    <a asp-page="./Register" asp-route-returnUrl="@Model.ReturnUrl" style="color: #ee626b; font-weight: bold;">Đăng ký ngay</a>
+                                </p>
+                                <p>
+                                    <a id="resend-confirmation" asp-page="./ResendEmailConfirmation" style="color: #008af8;">Gửi lại email xác nhận</a>
+                                </p>
+                            </div>
+
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-lg-6 mt-5 mt-lg-0">
+                <div class="contact-form" style="background-color: #f7f7f7; padding: 40px; border-radius: 25px; height: 100%; display: flex; flex-direction: column; justify-content: center;">
+                    <div class="section-heading text-center mb-4">
+                        <h6>HOẶC</h6>
+                        <h2>Dùng dịch vụ khác</h2>
+                    </div>
+
+                    @{
+                        if ((Model.ExternalLogins?.Count ?? 0) == 0)
+                        {
+                            <div class="text-center text-muted">
+                                <p style="font-size: 15px;">Hệ thống hiện chưa cấu hình đăng nhập qua các dịch vụ bên ngoài (Google, Facebook...).</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <form id="external-account" asp-page="./ExternalLogin" asp-route-returnUrl="@Model.ReturnUrl" method="post" class="text-center">
+                                <div>
+                                    @foreach (var provider in Model.ExternalLogins!)
+                                    {
+                                        <button type="submit" class="btn w-100 mb-3" name="provider" value="@provider.Name" title="Log in using your @provider.DisplayName account" style="background-color: #008af8; color: #fff; border: none; padding: 12px; border-radius: 25px; font-weight: bold;">Đăng nhập bằng @provider.DisplayName</button>
+                                    }
+                                </div>
+                            </form>
+                        }
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

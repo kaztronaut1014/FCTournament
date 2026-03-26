@@ -1,0 +1,108 @@
+﻿@model FCTournament.Models.Team
+@using Microsoft.AspNetCore.Identity
+@using FCTournament.Models
+@using FCTournament.Repository
+
+@inject UserManager<ApplicationUser> UserManager
+@inject IPlayerRepository PlayerRepo
+
+@{
+    ViewData["Title"] = "Đội bóng: " + Model.FullName;
+
+    // Kiểm tra xem User hiện tại có phải là cầu thủ của đội này không
+    var currentUserId = UserManager.GetUserId(User);
+    var playerProfile = currentUserId != null ? await PlayerRepo.GetPlayerByUserIdAsync(currentUserId) : null;
+
+    bool isMyTeam = playerProfile != null && playerProfile.TeamId == Model.Id;
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>CHI TIẾT ĐỘI BÓNG</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > <a asp-action="Index">Đội bóng</a> > @Model.ShortName</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="single-product section py-5" style="background-color: #fcfcfc; font-family: 'Poppins', sans-serif;">
+    <div class="container">
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success text-center fw-bold mb-4" style="border-radius: 15px;">
+                <i class="fa fa-check-circle me-2"></i> @TempData["SuccessMessage"]
+            </div>
+        }
+
+        <div class="row bg-white p-4 p-md-5" style="border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05);">
+
+            <div class="col-lg-4 text-center mb-4 mb-lg-0">
+                <div style="background: linear-gradient(135deg, #f7f7f7 0%, #eaeaea 100%); padding: 30px; border-radius: 25px;">
+                    <img src="@(string.IsNullOrEmpty(Model.Logo) ? $"https://ui-avatars.com/api/?name={Model.ShortName}&background=random&color=fff&size=250" : Model.Logo)"
+                         style="width: 100%; max-width: 250px; aspect-ratio: 1; border-radius: 50%; object-fit: cover; border: 10px solid #fff; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+                </div>
+
+                @if (isMyTeam)
+                {
+                    <div class="mt-4">
+                        <form asp-action="LeaveTeam" method="post" onsubmit="return confirm('Bạn có chắc chắn muốn rời bỏ đội bóng này không?');">
+                            <input type="hidden" name="teamId" value="@Model.Id" />
+                            <button type="submit" class="btn w-100" style="background-color: #ee626b; color: #fff; font-size: 16px; font-weight: 600; padding: 12px 20px; border-radius: 15px; box-shadow: 0px 5px 15px rgba(238, 98, 107, 0.3);">
+                                <i class="fa fa-sign-out-alt me-2"></i> Rời đội bóng
+                            </button>
+                        </form>
+                    </div>
+                }
+            </div>
+
+            <div class="col-lg-8 align-self-start ps-lg-5">
+                <h1 class="fw-bold mb-2" style="font-size: 40px; color: #222;">@Model.FullName</h1>
+                <p class="text-muted mb-4" style="font-size: 16px;">
+                    <span class="me-3"><i class="fa fa-map-marker-alt text-danger me-1"></i> @(Model.Location?.Name ?? "Đang cập nhật")</span>
+                    <span class="me-3"><i class="fa fa-tag text-primary me-1"></i> Viết tắt: <strong class="text-dark">@Model.ShortName</strong></span>
+                    <span><i class="fa fa-calendar text-success me-1"></i> Thành lập: <strong class="text-dark">@Model.EstablishDate.ToString("dd/MM/yyyy")</strong></span>
+                </p>
+
+                <hr class="mb-4">
+
+                <h4 class="fw-bold mb-4" style="color: #333;">Danh sách thi đấu (Squad)</h4>
+
+                @if (Model.Players != null)
+                {
+                    <div class="row g-3">
+                        @foreach (var player in Model.Players)
+                        {
+                            // Logic xử lý Tên và Tuổi
+                            string displayName = player.NickName;
+                            if (string.IsNullOrWhiteSpace(displayName)) displayName = player.User?.FullName;
+                            if (string.IsNullOrWhiteSpace(displayName)) displayName = "Người chơi ẩn danh";
+
+
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center p-3" style="background: #f9f9f9; border-radius: 15px; border: 1px solid #eee; transition: 0.3s;" onmouseover="this.style.borderColor='#008af8'" onmouseout="this.style.borderColor='#eee'">
+                                    <img src="https://ui-avatars.com/api/?name=@displayName&background=random&color=fff&size=50"
+                                         style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px; border: 2px solid #ddd;">
+                                    <div>
+                                        <h6 class="fw-bold m-0" style="color: #222; font-size: 15px;">@displayName</h6>
+                                        <span class="text-muted" style="font-size: 12px;">Thành viên</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center py-4" style="background: #f9f9f9; border-radius: 15px; border: 1px dashed #ccc;">
+                        <img src="https://ui-avatars.com/api/?name=Empty&background=eaeaea&color=999&size=60" style="border-radius: 50%; margin-bottom: 10px;">
+                        <p class="text-muted m-0">Đội bóng này hiện chưa có thành viên nào.</p>
+                    </div>
+                }
+
+            </div>
+        </div>
+    </div>
+</div>

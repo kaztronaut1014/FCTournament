@@ -1,0 +1,147 @@
+﻿@model IEnumerable<FCTournament.Models.Team>
+@using Microsoft.AspNetCore.Identity
+@using FCTournament.Models
+@using FCTournament.Repository
+
+@inject UserManager<ApplicationUser> UserManager
+@inject EFManagerRepository ManagerRepo
+
+@{
+    ViewData["Title"] = "Đội bóng của tôi";
+    var currentUserId = UserManager.GetUserId(User);
+
+    var managerProfile = await ManagerRepo.GetManagerByUserIdAsync(currentUserId);
+    bool isManager = managerProfile != null;
+
+    // Lấy thông tin đội bóng đang thi đấu từ Controller
+    var myPlayingTeam = ViewBag.MyPlayingTeam as FCTournament.Models.Team;
+
+    bool hasManagedTeams = Model != null && Model.Any();
+    bool hasPlayingTeam = myPlayingTeam != null;
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Đội bóng của tôi</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > Đội bóng</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section trending" style="font-family: 'Poppins', sans-serif;">
+    <div class="container">
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show text-center fw-bold mb-4" style="border-radius: 15px;">
+                <i class="fa fa-exclamation-triangle me-2"></i> @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show text-center fw-bold mb-4" style="border-radius: 15px;">
+                <i class="fa fa-check-circle me-2"></i> @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        }
+
+        @if (!hasManagedTeams && !hasPlayingTeam)
+        {
+            <div class="row justify-content-center mt-5">
+                <div class="col-lg-8 text-center">
+                    <img src="/assets/images/team-placeholder.png" onerror="this.src='https://ui-avatars.com/api/?name=No+Team&background=f7f7f7&color=ccc&size=150'" style="width: 150px; margin-bottom: 20px; border-radius: 50%;">
+                    <h3 class="fw-bold mb-3" style="color: #333;">Bạn chưa tham gia đội bóng nào</h3>
+                    <p class="text-muted mb-4">Hãy chờ Ban quản lý mời bạn vào đội, hoặc tự thành lập đội bóng của riêng mình.</p>
+
+                        <a asp-action="Create" class="btn px-5 py-3 fw-bold" style="background-color: #ee626b; color: white; border-radius: 30px; font-size: 16px; box-shadow: 0 5px 15px rgba(238,98,107,0.3);">
+                            <i class="fa fa-shield-alt me-2"></i> TẠO ĐỘI BÓNG NGAY
+                        </a>
+                </div>
+            </div>
+        }
+        else
+        {
+            @if (hasPlayingTeam)
+            {
+                <div class="row mb-4 mt-4">
+                    <div class="col-lg-12">
+                        <div class="section-heading m-0">
+                            <h6>THÀNH VIÊN</h6>
+                            <h2>Đội bóng đang thi đấu</h2>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row justify-content-center mb-5">
+                    <div class="col-lg-6">
+                        <div class="card border-0" style="border-radius: 20px; overflow: hidden; background-color: #fff; box-shadow: 0px 5px 20px rgba(0,0,0,0.08);">
+                            <div style="height: 100px; background: linear-gradient(135deg, #ee626b 0%, #f78b92 100%);"></div>
+                            <div class="card-body text-center" style="padding: 0 20px 20px 20px;">
+                                <div style="margin-top: -50px; margin-bottom: 15px; z-index: 10;">
+                                    <img src="@(string.IsNullOrEmpty(myPlayingTeam.Logo) ? $"https://ui-avatars.com/api/?name={myPlayingTeam.ShortName}&background=random&color=fff&size=100" : myPlayingTeam.Logo)"
+                                         style="width: 100px; height: 100px; border-radius: 50%; border: 5px solid #fff; object-fit: cover;">
+                                </div>
+                                <h4 class="fw-bold mb-2">@myPlayingTeam.FullName</h4>
+                                <p class="text-muted mb-4"><i class="fa fa-map-marker-alt text-danger"></i> @(myPlayingTeam.Location?.Name ?? "Tự do")</p>
+
+                                <div class="d-flex gap-2 justify-content-center">
+                                    <a asp-action="Details" asp-route-id="@myPlayingTeam.Id" class="btn fw-bold px-4" style="background-color: #f8f9fa; color: #333; border-radius: 15px; border: 1px solid #ddd;">
+                                        Xem chi tiết đội bóng
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (hasManagedTeams)
+            {
+                <div class="row mb-4 mt-4">
+                    <div class="col-lg-12 d-flex justify-content-between align-items-end">
+                        <div class="section-heading m-0">
+                            <h6>QUẢN LÝ</h6>
+                            <h2>Đội bóng của bạn</h2>
+                        </div>
+                        @if (isManager)
+                        {
+                            <a asp-action="Create" class="btn fw-bold" style="background-color: #008af8; color: white; border-radius: 15px;">
+                                <i class="fa fa-plus me-1"></i> Tạo thêm đội
+                            </a>
+                        }
+                    </div>
+                </div>
+
+                <div class="row">
+                    @foreach (var team in Model)
+                    {
+                        <div class="col-lg-4 col-md-6 mb-4">
+                            <div class="card h-100 border-0" style="border-radius: 20px; overflow: hidden; background-color: #fff; box-shadow: 0px 5px 20px rgba(0,0,0,0.08);">
+                                <div style="height: 100px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);">
+                                    <span class="badge" style="position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.2); font-size: 14px; border-radius: 10px;">@team.ShortName</span>
+                                </div>
+                                <div class="card-body text-center" style="padding: 0 20px 20px 20px;">
+                                    <div style="margin-top: -50px; margin-bottom: 15px; z-index: 10;">
+                                        <img src="@(string.IsNullOrEmpty(team.Logo) ? $"https://ui-avatars.com/api/?name={team.ShortName}&background=random&color=fff&size=100" : team.Logo)"
+                                             style="width: 100px; height: 100px; border-radius: 50%; border: 5px solid #fff; object-fit: cover;">
+                                    </div>
+                                    <h4 class="fw-bold mb-2">@team.FullName</h4>
+                                    <p class="text-muted mb-4"><i class="fa fa-map-marker-alt text-danger"></i> @(team.Location?.Name ?? "Đang cập nhật")</p>
+
+                                    <div class="mt-auto d-flex gap-2 justify-content-center">
+                                        <a asp-action="Details" asp-route-id="@team.Id" class="btn w-50 fw-bold" style="background-color: #f8f9fa; color: #333; border-radius: 15px; border: 1px solid #ddd;">Chi tiết</a>
+                                        <a asp-action="Edit" asp-route-id="@team.Id" class="btn w-50 fw-bold" style="background-color: #008af8; color: #fff; border-radius: 15px;">Quản lý</a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div>
+</div>

@@ -1,0 +1,131 @@
+﻿@model FCTournament.Models.Team
+@{
+    ViewData["Title"] = "Thành lập đội bóng";
+}
+
+<style>
+    /* Ép ẩn input file mặc định */
+    input[type="file"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        position: absolute !important;
+    }
+
+    /* Ép Font Poppins cho TOÀN BỘ form và các thẻ chữ */
+    .profile-card,
+    .profile-card input,
+    .profile-card select,
+    .profile-card button,
+    .profile-card h3,
+    .profile-card span,
+    .profile-card label {
+        font-family: 'Poppins', sans-serif !important;
+    }
+</style>
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Thành Lập Đội Bóng</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > <a asp-action="Index">Đội bóng</a> > Tạo mới</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="create-form-area section py-5">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <form asp-action="Create" method="post" enctype="multipart/form-data" class="profile-card" style="background-color: #fff; border-radius: 25px; overflow: hidden; box-shadow: 0px 10px 30px rgba(0,0,0,0.08); border: 1px solid #eee;">
+
+                    <div style="height: 150px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); position: relative; display: block; margin: 0; padding: 0;">
+                    </div>
+
+                    <div class="profile-content" style="padding: 0 40px 40px 40px; position: relative; text-align: left; display: flex; flex-direction: column;">
+
+                        <div style="margin-top: -65px; margin-bottom: 25px; position: relative; z-index: 20; display: inline-block; cursor: pointer; width: 130px; height: 130px; margin-left: auto; margin-right: auto;" onclick="triggerLogoClick()">
+
+                            <img src="/assets/images/default-avatar.png" id="imagePreview" alt="Team Logo" style="width: 130px; height: 130px; border-radius: 50%; border: 6px solid #fff; object-fit: cover; background-color: #fff; box-shadow: 0px 5px 15px rgba(0,0,0,0.2); display: block;">
+
+                            <div class="add-overlay" style="position: absolute; bottom: 5px; right: 5px; background: #ee626b; color: #fff; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #fff; z-index: 25; transition: 0.3s;">
+                                <i class="fa fa-camera"></i>
+                            </div>
+
+                            <input type="file" id="teamLogoInput" name="logoFile" accept="image/*" onchange="previewLogo(this)">
+                        </div>
+
+                        <div style="text-align: center; margin-bottom: 30px;">
+                            <h3 style="font-size: 26px; font-weight: 800; color: #222; margin: 0 0 5px 0; text-transform: uppercase;">
+                                Hồ Sơ Đội Bóng
+                            </h3>
+                            <span style="font-size: 15px; color: #777;">Điền thông tin cơ bản để bắt đầu</span>
+                        </div>
+
+                        <div asp-validation-summary="ModelOnly" class="text-danger mb-3 text-center fw-bold"></div>
+
+                        <div class="row">
+                            <div class="col-md-8 mb-4">
+                                <label class="form-label fw-bold" style="color: #444;">Tên câu lạc bộ <span class="text-danger">*</span></label>
+                                <input asp-for="FullName" class="form-control" placeholder="VD: Manchester United..." style="border-radius: 15px; padding: 12px 20px; border: 1px solid #ddd; background-color: #f9f9f9;" required>
+                                <span asp-validation-for="FullName" class="text-danger" style="font-size: 13px;"></span>
+                            </div>
+
+                            <div class="col-md-4 mb-4">
+                                <label class="form-label fw-bold" style="color: #444;">Viết tắt <span class="text-danger">*</span></label>
+                                <input asp-for="ShortName" class="form-control" placeholder="VD: MUFC" maxlength="4" style="border-radius: 15px; padding: 12px 20px; border: 1px solid #ddd; background-color: #f9f9f9; text-transform: uppercase;" required>
+                                <span asp-validation-for="ShortName" class="text-danger" style="font-size: 13px;"></span>
+                                <small class="text-muted" style="font-size: 11px;">(Từ 2 - 4 ký tự)</small>
+                            </div>
+
+                            <div class="col-md-12 mb-5">
+                                <label class="form-label fw-bold" style="color: #444;">Khu vực hoạt động <span class="text-danger">*</span></label>
+                                <select asp-for="LocationId" asp-items="ViewBag.LocationId" class="form-select" style="border-radius: 15px; padding: 12px 20px; border: 1px solid #ddd; background-color: #f9f9f9;" required>
+                                    <option value="">-- Chọn Tỉnh / Thành phố --</option>
+                                </select>
+                                <span asp-validation-for="LocationId" class="text-danger" style="font-size: 13px;"></span>
+                            </div>
+
+                            <div class="col-md-12 d-flex justify-content-center gap-3">
+                                <button type="submit" class="btn px-5 py-3 fw-bold" style="background-color: #008af8; color: white; border-radius: 30px; text-transform: uppercase; box-shadow: 0 5px 15px rgba(0,138,248,0.3); font-size: 16px;">
+                                    <i class="fa fa-shield-alt me-2"></i> Hoàn tất tạo đội
+                                </button>
+                                <a asp-action="Index" class="btn px-5 py-3 fw-bold" style="background-color: #eee; color: #555; border-radius: 30px; text-decoration: none; text-transform: uppercase; font-size: 16px;">
+                                    Hủy bỏ
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function triggerLogoClick() {
+            document.getElementById('teamLogoInput').click();
+        }
+
+        function previewLogo(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('imagePreview').src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // Tự động viết hoa toàn bộ ký tự khi gõ vào ô ShortName
+        document.getElementById('ShortName').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+    </script>
+}

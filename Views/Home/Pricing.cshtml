@@ -1,0 +1,84 @@
+﻿@model IEnumerable<FCTournament.Models.Subscription>
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using FCTournament.Models
+
+@inject UserManager<ApplicationUser> UserManager
+@inject ApplicationDbContext DbContext
+
+@{
+    ViewData["Title"] = "Gói nâng cấp";
+
+    // Lấy thông tin người dùng và gói hiện tại của họ
+    var user = await UserManager.GetUserAsync(User);
+    Organizer currentOrg = null;
+    if (user != null)
+    {
+        currentOrg = await DbContext.Organizers.FirstOrDefaultAsync(o => o.ApplicationUserId == user.Id);
+    }
+}
+
+<div class="page-heading header-text">
+    <div class="container"><div class="row"><div class="col-lg-12"><h3>Bảng giá dịch vụ</h3></div></div></div>
+</div>
+
+<div class="container py-5">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success text-center fw-bold mb-4" style="border-radius: 15px;">@TempData["SuccessMessage"]</div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger text-center fw-bold mb-4" style="border-radius: 15px;">@TempData["ErrorMessage"]</div>
+    }
+
+    <div class="row justify-content-center g-4">
+        @foreach (var sub in Model)
+        {
+            // Kiểm tra trạng thái gói cước đối với User hiện tại
+            bool isCurrent = currentOrg != null && currentOrg.SubscriptionId == sub.Id;
+            bool isPending = currentOrg != null && currentOrg.PendingSubscriptionId == sub.Id;
+
+            <div class="col-lg-4 col-md-6">
+                <div class="card h-100 text-center p-4" style="border-radius: 25px; border: 2px solid @(isCurrent ? "#28a745" : (sub.Name.Contains("Pro") || sub.Name.Contains("Semi-Pro") ? "#008af8" : "#eee")); box-shadow: 0 10px 30px rgba(0,0,0,0.05); position: relative;">
+
+                    @if (isCurrent)
+                    {
+                        <span class="badge bg-success position-absolute top-0 start-50 translate-middle px-3 py-2" style="font-size: 14px; border-radius: 10px;">GÓI HIỆN TẠI</span>
+                    }
+
+                    <h4 class="fw-bold mt-3" style="color: #222;">@sub.Name</h4>
+                    <h2 class="fw-bold my-4" style="color: #ee626b;">
+                        @sub.Description
+                        @if (sub.Name != "Amateur")
+                        {
+                            <small class="text-muted fs-6">/Tháng</small>
+                        }
+                    </h2>
+
+                    @if (isCurrent)
+                    {
+                        <button type="button" class="btn w-100 py-3 fw-bold" style="background-color: #e8f5e9; color: #28a745; border: 2px solid #28a745; border-radius: 15px;" disabled>
+                            <i class="fa fa-check-circle me-1"></i> Đang sử dụng
+                        </button>
+                    }
+                    else if (isPending)
+                    {
+                        <button type="button" class="btn w-100 py-3 fw-bold" style="background-color: #fff8e1; color: #ff9800; border: 2px solid #ff9800; border-radius: 15px;" disabled>
+                            <i class="fa fa-hourglass-half me-1"></i> Đang chờ duyệt
+                        </button>
+                    }
+                    else
+                    {
+                        <form asp-controller="Home" asp-action="RequestUpgrade" method="post">
+                            <input type="hidden" name="subId" value="@sub.Id" />
+                            <button type="submit" class="btn w-100 py-3 fw-bold" style="background-color: @(sub.Name.Contains("Pro") || sub.Name.Contains("Semi-Pro") ? "#008af8" : "#e6f3ff"); color: @(sub.Name.Contains("Semi-Pro") || sub.Name.Contains("Pro") ? "white" : "#008af8"); border-radius: 15px;">
+                                Đăng ký ngay
+                            </button>
+                        </form>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+</div>

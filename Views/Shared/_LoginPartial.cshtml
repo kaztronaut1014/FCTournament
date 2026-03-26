@@ -1,0 +1,25 @@
+﻿@using Microsoft.AspNetCore.Identity
+@* Lưu ý: Nếu bạn đã đổi sang ApplicationUser ở các bước trước, hãy sửa IdentityUser thành ApplicationUser ở 2 dòng dưới *@
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+
+@if (SignInManager.IsSignedIn(User))
+{
+    <li>
+        <a asp-area="Identity" asp-page="/Account/Manage/Index" title="Quản lý tài khoản">
+            Chào @UserManager.GetUserName(User)!
+        </a>
+    </li>
+    <li>
+        <form id="logoutForm" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" method="post" style="display:none;">
+        </form>
+        <a href="javascript:document.getElementById('logoutForm').submit()" style="cursor: pointer;">
+            Đăng xuất
+        </a>
+    </li>
+}
+else
+{
+    <li><a asp-area="Identity" asp-page="/Account/Login">Đăng nhập</a></li>
+    <li><a asp-area="Identity" asp-page="/Account/Register">Đăng ký</a></li>
+}

@@ -1,0 +1,309 @@
+﻿@model IEnumerable<FCTournament.Models.Tournament>
+@using Microsoft.AspNetCore.Identity
+@using FCTournament.Models
+@using FCTournament.Repository
+
+@inject UserManager<ApplicationUser> UserManager
+@inject EFOrganizerRepository OrganizerRepo
+@inject ApplicationDbContext DbContext
+
+@{
+    ViewData["Title"] = "Hệ thống giải đấu";
+    var currentUserId = UserManager.GetUserId(User);
+
+    // Tạo 2 danh sách riêng biệt
+    var mainBoxTournaments = new List<Tournament>();
+    var historyTournaments = new List<Tournament>();
+    bool canCreateMore = true;
+
+    if (currentUserId != null)
+    {
+        // 1. LẤY GIẢI DO MÌNH TỔ CHỨC (Organizer) - Luôn nằm ở Box chính
+        var organizedTournaments = Model.Where(t => t.ApplicationUserId == currentUserId && !t.IsDeleted).ToList();
+
+        // 2. Tìm các đội bóng mình làm Quản lý hoặc Cầu thủ
+        var relatedTeamIds = DbContext.Teams.Where(t => t.ApplicationUserId == currentUserId).Select(t => t.Id).ToList();
+        var playerTeamId = DbContext.Players.Where(p => p.ApplicationUserId == currentUserId && p.TeamId != null).Select(p => p.TeamId).FirstOrDefault();
+        if (playerTeamId != null) { relatedTeamIds.Add(playerTeamId.Value); }
+
+        // 3. Lấy giải các đội trên tham gia (Loại trừ các giải mình tự tổ chức để khỏi bị lặp)
+        var participatingTournamentIds = DbContext.TournamentTeams
+            .Where(tt => relatedTeamIds.Contains(tt.TeamId))
+            .Select(tt => tt.TournamentId)
+            .ToList();
+
+        var participatingTournaments = Model.Where(t => participatingTournamentIds.Contains(t.Id) && t.ApplicationUserId != currentUserId && !t.IsDeleted).ToList();
+
+        // 4. PHÂN LOẠI GIẢI ĐANG THAM GIA
+        foreach (var t in participatingTournaments)
+        {
+            if (t.IsFinished)
+            {
+                // Nếu đã kết thúc -> Cất xuống box Lịch sử
+                historyTournaments.Add(t);
+            }
+            else
+            {
+                // Nếu đang đá -> Để ở box Chính
+                mainBoxTournaments.Add(t);
+            }
+        }
+
+        // 5. Gộp giải mình Tổ chức (luôn hiển thị) và Giải đang tham gia vào chung 1 Box Chính
+        mainBoxTournaments = organizedTournaments.Union(mainBoxTournaments).ToList();
+
+        // Check giới hạn tạo giải (Hoàn lại lượt tạo nếu giải đã kết thúc)
+        int maxAllowed = 1;
+        var orgProfile = await OrganizerRepo.GetOrganizerByUserIdAsync(currentUserId);
+        if (orgProfile != null)
+        {
+            if (orgProfile.SubscriptionId == 3) maxAllowed = 2;
+            else if (orgProfile.SubscriptionId == 4) maxAllowed = 4;
+        }
+
+        // CHỈ ĐẾM NHỮNG GIẢI ĐANG HOẠT ĐỘNG
+        var activeTournamentsCount = organizedTournaments.Count(t => !t.IsFinished);
+        if (activeTournamentsCount >= maxAllowed) canCreateMore = false;
+    }
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Hệ thống giải đấu</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > Giải đấu</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section trending" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <div class="container">
+
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger alert-dismissible fade show text-center py-3 fw-bold mb-4" role="alert" style="border-radius: 15px;">
+                <i class="fa fa-exclamation-triangle me-2"></i> @TempData["ErrorMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show text-center py-3 fw-bold mb-4" role="alert" style="border-radius: 15px;">
+                <i class="fa fa-check-circle me-2"></i> @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        @if (mainBoxTournaments.Any())
+        {
+            <div class="row mb-5" style="background-color: #f0f8ff; padding: 40px 20px; border-radius: 25px; border: 2px dashed #008af8;">
+                <div class="col-lg-12">
+                    <div class="section-heading mb-4">
+                        <h6 style="color: #008af8;">QUẢN LÝ & ĐANG THAM GIA</h6>
+                        <h2>Giải đấu của bạn</h2>
+                    </div>
+                </div>
+
+                @foreach (var t in mainBoxTournaments)
+                {
+                    bool isOrg = (t.ApplicationUserId == currentUserId);
+
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="item bg-white" style="border-radius: 20px; padding: 20px; box-shadow: 0px 5px 15px rgba(0,0,0,0.05); transition: transform 0.3s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                            <div class="d-flex align-items-center mb-3">
+                                <img src="@(string.IsNullOrEmpty(t.LogoUrl) ? "/assets/images/default-avatar.png" : t.LogoUrl)" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #eee;">
+                                <div class="ms-3">
+                                    <h4 class="text-truncate" style="margin: 0; font-size: 18px; font-weight: bold; color: #333; max-width: 180px;" title="@t.Name">@t.Name</h4>
+
+                                    @if (t.IsFinished)
+                                    {
+                                        <span class="badge bg-secondary mt-1"><i class="fa fa-lock me-1"></i>Đã kết thúc</span>
+                                    }
+                                    else
+                                    {
+                                        <span style="font-size: 13px; color: #888;">Khởi tranh: @t.StartDate.ToString("dd/MM/yyyy")</span>
+                                    }
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-between mt-3 gap-2">
+                                @if (isOrg)
+                                {
+                                    <a asp-action="Details" asp-route-id="@t.Id" class="btn w-50 fw-bold" style="background-color: #eee; color: #333; border-radius: 15px; padding: 8px;">Chi tiết</a>
+                                    <a asp-action="Edit" asp-route-id="@t.Id" class="btn w-50 fw-bold" style="background-color: #008af8; color: #fff; border-radius: 15px; padding: 8px;">Quản lý</a>
+                                }
+                                else
+                                {
+                                    <a asp-action="Details" asp-route-id="@t.Id" class="btn w-100 fw-bold" style="background-color: #eee; color: #333; border-radius: 15px; padding: 8px;">Xem chi tiết</a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (historyTournaments.Any())
+        {
+            <div class="row mb-5" style="background-color: #ffffff; padding: 40px 20px; border-radius: 25px; border: 2px solid #eaeaea; opacity: 0.9;">
+                <div class="col-lg-12">
+                    <div class="section-heading mb-4">
+                        <h6 class="text-secondary">LỊCH SỬ</h6>
+                        <h2 class="text-secondary">Giải đấu đã tham gia</h2>
+                    </div>
+                </div>
+
+                @foreach (var t in historyTournaments)
+                {
+                    <div class="col-lg-4 col-md-6 mb-4">
+                        <div class="item bg-light" style="border-radius: 20px; padding: 20px; border: 1px solid #eee;">
+                            <div class="d-flex align-items-center mb-3">
+                                <img src="@(string.IsNullOrEmpty(t.LogoUrl) ? "/assets/images/default-avatar.png" : t.LogoUrl)" style="width: 70px; height: 70px; border-radius: 50%; object-fit: cover; border: 3px solid #ddd; filter: grayscale(30%);">
+                                <div class="ms-3">
+                                    <h4 class="text-truncate" style="margin: 0; font-size: 18px; font-weight: bold; color: #666; max-width: 180px;" title="@t.Name">@t.Name</h4>
+                                    <span class="badge bg-secondary mt-1"><i class="fa fa-flag-checkered me-1"></i>Đã kết thúc</span>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <a asp-action="Details" asp-route-id="@t.Id" class="btn w-100 fw-bold btn-outline-secondary" style="border-radius: 15px; padding: 8px;">Xem kết quả</a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+
+        <div class="row">
+            <div class="col-lg-12">
+                <div class="section-heading">
+                    <h6>CỘNG ĐỒNG</h6>
+                    <h2>Các giải đấu hiện tại</h2>
+                </div>
+            </div>
+            <div class="col-lg-12">
+                <ul class="trending-filter">
+                    <li><a class="is_active" href="#!" data-filter="*">Tất cả</a></li>
+                    <li><a href="#!" data-filter=".ongoing">Đang diễn ra</a></li>
+                    <li><a href="#!" data-filter=".upcoming">Sắp diễn ra</a></li>
+                    <li><a href="#!" data-filter=".finished">Đã kết thúc</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="row trending-box mt-4">
+            @foreach (var t in Model.Where(x => !x.IsDeleted))
+            {
+                var endDate = t.StartDate.AddDays(t.DurationDays);
+                var today = DateOnly.FromDateTime(DateTime.Now);
+                string statusClass = "upcoming";
+                string statusText = "Sắp diễn ra";
+                string badgeColor = "#008af8";
+
+                // Ưu tiên cờ IsFinished hoặc Ngày hiện tại > Ngày kết thúc
+                if (t.IsFinished || today > endDate)
+                {
+                    statusClass = "finished";
+                    statusText = "Đã kết thúc";
+                    badgeColor = "#6c757d";
+                }
+                else if (today >= t.StartDate && today <= endDate)
+                {
+                    statusClass = "ongoing";
+                    statusText = "Đang diễn ra";
+                    badgeColor = "#ee626b";
+                }
+
+                <div class="col-lg-3 col-md-6 mb-4 trending-items @statusClass" style="margin-bottom: 30px;">
+                    <div style="border-radius: 20px; overflow: hidden; background-color: #fff; box-shadow: 0px 5px 20px rgba(0,0,0,0.08); position: relative; border: 1px solid #f0f0f0; transition: transform 0.3s; height: 380px; display: flex; flex-direction: column;"
+                         onmouseover="this.style.transform='translateY(-8px)'" onmouseout="this.style.transform='translateY(0)'">
+
+                        <div style="position: relative; height: 160px; flex-shrink: 0;">
+                            <a asp-action="Details" asp-route-id="@t.Id">
+                                <img src="@(string.IsNullOrEmpty(t.BannerUrl) ? "/assets/images/placeholder-banner.jpg" : t.BannerUrl)" style="height: 160px; width: 100%; object-fit: cover; display: block;">
+                            </a>
+                            <span style="background-color: @badgeColor; color: #fff; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 15px; position: absolute; top: 15px; right: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+                                @statusText
+                            </span>
+                        </div>
+
+                        <div style="position: absolute; top: 125px; left: 20px; z-index: 10;">
+                            <img src="@(string.IsNullOrEmpty(t.LogoUrl) ? "/assets/images/default-avatar.png" : t.LogoUrl)" style="width: 65px; height: 65px; border-radius: 50%; border: 3px solid #fff; object-fit: cover; background-color: #fff; box-shadow: 0px 4px 8px rgba(0,0,0,0.1);">
+                        </div>
+
+                        <div style="padding: 45px 20px 20px 20px; text-align: left; display: flex; flex-direction: column; flex-grow: 1;">
+                            <h4 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                <a asp-action="Details" asp-route-id="@t.Id" style="color: #222; text-decoration: none;" title="@t.Name">@t.Name</a>
+                            </h4>
+
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                                <span style="background-color: #ffeeee; color: #ee626b; font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 8px; display: inline-flex; align-items: center; white-space: nowrap;">
+                                    <i class="fa fa-map-marker-alt me-1"></i> @(t.Type != null ? t.Type.Name : "Sân bóng")
+                                </span>
+                                <span style="background-color: #e6f3ff; color: #008af8; font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 8px; display: inline-flex; align-items: center; white-space: nowrap;">
+                                    <i class="fa fa-trophy me-1"></i> @(t.Format != null ? t.Format.Name : "Thể thức")
+                                </span>
+
+                                @if (t.needApproved)
+                                {
+                                    <span style="background-color: #fff4e5; color: #ff9800; font-size: 11px; font-weight: 600; padding: 5px 10px; border-radius: 8px; display: inline-flex; align-items: center; white-space: nowrap;">
+                                        <i class="fa fa-user-check me-1"></i> Cần duyệt
+                                    </span>
+                                }
+                            </div>
+
+                            <a asp-action="Details" asp-route-id="@t.Id" style="display: block; text-align: center; background-color: #f8f9fa; color: #333; font-weight: 600; font-size: 14px; padding: 10px; border-radius: 12px; text-decoration: none; border: 1px solid #ddd; transition: all 0.2s; margin-top: auto;" onmouseover="this.style.backgroundColor='#ee626b'; this.style.color='#fff'; this.style.borderColor='#ee626b';" onmouseout="this.style.backgroundColor='#f8f9fa'; this.style.color='#333'; this.style.borderColor='#ddd';">
+                                Xem chi tiết
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div> <div style="clear: both; width: 100%; height: 20px; display: block;"></div>
+
+        @if (canCreateMore)
+        {
+            <div class="row mt-4 mb-5" style="position: relative; z-index: 10; clear: both;">
+                <div class="col-lg-12">
+                    <section style="background-color: #f7f7f7; padding: 60px 0; border-radius: 25px; position: relative; overflow: hidden; border: 1px solid #eee; box-shadow: 0px 5px 20px rgba(0,0,0,0.03);">
+
+                        <div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(42,85,179,0.1) 0%, rgba(255,255,255,0) 70%); border-radius: 50%; z-index: 0;"></div>
+                        <div style="position: absolute; bottom: -80px; left: -80px; width: 300px; height: 300px; background: radial-gradient(circle, rgba(238,98,107,0.1) 0%, rgba(255,255,255,0) 70%); border-radius: 50%; z-index: 0;"></div>
+
+                        <div class="container" style="position: relative; z-index: 1;">
+                            <div class="row align-items-center">
+                                <div class="col-lg-12 text-center">
+                                    <h2 style="font-size: 36px; font-weight: 800; color: #333; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px;">
+                                        Sẵn sàng tạo nên <span style="color: #ee626b;">Sân Chơi</span> của bạn?
+                                    </h2>
+                                    <p style="font-size: 18px; color: #555; margin-bottom: 40px; line-height: 1.6;">
+                                        Khởi tạo giải đấu chuyên nghiệp, quản lý đội bóng và lịch thi đấu chỉ trong vài thao tác.
+                                    </p>
+
+                                    <div style="display: flex; justify-content: center;">
+                                        <a asp-action="Create" style="display: inline-flex; align-items: center; justify-content: center; background-color: #008af8; color: #ffffff !important; font-size: 18px; font-weight: 700; padding: 0 50px; height: 60px; border-radius: 50px; text-decoration: none; transition: all 0.3s ease; box-shadow: 0px 10px 20px rgba(0, 138, 248, 0.3);"
+                                           onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0px 15px 25px rgba(0, 138, 248, 0.4)';"
+                                           onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0px 10px 20px rgba(0, 138, 248, 0.3)';">
+                                            <i class="fa fa-trophy me-2"></i> Tạo giải đấu ngay
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div style="height: 50px; clear: both;"></div>
+        }
+        else
+        {
+            <div class="text-center mt-5 mb-5" style="clear: both; padding-top: 50px;">
+                <p class="text-muted" style="font-size: 15px;">
+                    <i class="fa fa-info-circle"></i> Bạn đã đạt giới hạn tạo giải đấu của gói hiện tại. Vui lòng kết thúc giải cũ hoặc nâng cấp gói để tạo thêm.
+                </p>
+            </div>
+        }
+
+    </div>
+</div>

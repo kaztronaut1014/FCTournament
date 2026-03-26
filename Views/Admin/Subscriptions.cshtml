@@ -1,0 +1,69 @@
+﻿@model IEnumerable<FCTournament.Models.Organizer>
+@{
+    ViewData["Title"] = "Duyệt Yêu Cầu Nâng Cấp";
+    var allSubs = ViewBag.AllSubs as IEnumerable<FCTournament.Models.Subscription>;
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>YÊU CẦU NÂNG CẤP GÓI</h3>
+                <span class="breadcrumb"><a asp-action="Index">Admin</a> > Duyệt gói cước</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success fw-bold mb-4" style="border-radius: 10px;">@TempData["SuccessMessage"]</div>
+    }
+
+    <div class="bg-white p-4" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+        <table class="table align-middle table-hover m-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Người dùng</th>
+                    <th>Email</th>
+                    <th>Gói hiện tại</th>
+                    <th><i class="fa fa-arrow-right text-success"></i> Muốn nâng cấp lên</th>
+                    <th class="text-end">Hành động</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model)
+                {
+                    var targetSub = allSubs?.FirstOrDefault(s => s.Id == item.PendingSubscriptionId);
+                    <tr>
+                        <td class="fw-bold">@item.User?.FullName</td>
+                        <td>@item.User?.Email</td>
+                        <td><span class="badge bg-secondary">@(item.Subscriptions?.Name ?? "N/A")</span></td>
+                        <td>
+                            <span class="badge" style="background-color: #008af8; font-size: 14px;">
+                                @(targetSub?.Name ?? "Gói " + item.PendingSubscriptionId)
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2">
+                                <form asp-action="ApproveSubscription" method="post">
+                                    <input type="hidden" name="organizerId" value="@item.Id" />
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold"><i class="fa fa-check"></i> Duyệt</button>
+                                </form>
+                                <form asp-action="RejectSubscription" method="post" onsubmit="return confirm('Từ chối yêu cầu này?');">
+                                    <input type="hidden" name="organizerId" value="@item.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fa fa-times"></i> Hủy</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+                @if (!Model.Any())
+                {
+                    <tr><td colspan="5" class="text-center text-muted py-5">Chưa có yêu cầu nâng cấp nào đang chờ.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

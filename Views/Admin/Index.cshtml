@@ -1,0 +1,54 @@
+﻿@{
+    ViewData["Title"] = "Bảng điều khiển Admin";
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>BẢNG ĐIỀU KHIỂN ADMIN</h3>
+                <span class="breadcrumb">Tổng quan tình hình hoạt động của hệ thống FC Tournament</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row g-4 mb-5">
+        <div class="col-lg-3 col-md-6">
+            <div class="p-4 bg-white text-center" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-bottom: 5px solid #008af8;">
+                <i class="fa fa-users fa-3x mb-3 text-primary"></i>
+                <h3 class="fw-bold">@ViewBag.TotalUsers</h3>
+                <p class="text-muted mb-0">Người dùng</p>
+                <a asp-action="Users" class="btn btn-sm btn-outline-primary mt-3 w-100" style="border-radius: 10px;">Quản lý chi tiết</a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="p-4 bg-white text-center" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-bottom: 5px solid #ee626b;">
+                <i class="fa fa-trophy fa-3x mb-3 text-danger"></i>
+                <h3 class="fw-bold">@ViewBag.TotalTournaments</h3>
+                <p class="text-muted mb-0">Giải đấu</p>
+                <a asp-action="Tournaments" class="btn btn-sm btn-outline-danger mt-3 w-100" style="border-radius: 10px;">Quản lý chi tiết</a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="p-4 bg-white text-center" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-bottom: 5px solid #20c997;">
+                <i class="fa fa-shield-alt fa-3x mb-3 text-success"></i>
+                <h3 class="fw-bold">@ViewBag.TotalTeams</h3>
+                <p class="text-muted mb-0">Đội bóng</p>
+                <a asp-action="Teams" class="btn btn-sm btn-outline-success mt-3 w-100" style="border-radius: 10px;">Quản lý chi tiết</a>
+            </div>
+        </div>
+
+        <div class="col-lg-3 col-md-6">
+            <div class="p-4 bg-white text-center" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); border-bottom: 5px solid #ffc107;">
+                <i class="fa fa-gem fa-3x mb-3 text-warning"></i>
+                <h3 class="fw-bold">@ViewBag.PendingRequests</h3>
+                <p class="text-muted mb-0">Yêu cầu Nâng cấp</p>
+                <a asp-action="Subscriptions" class="btn btn-sm btn-warning text-dark fw-bold mt-3 w-100" style="border-radius: 10px;">Duyệt ngay</a>
+            </div>
+        </div>
+    </div>
+</div>

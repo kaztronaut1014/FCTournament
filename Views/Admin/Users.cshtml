@@ -1,0 +1,181 @@
+﻿@model IEnumerable<FCTournament.Models.ApplicationUser>
+@{
+    ViewData["Title"] = "Quản lý Người dùng";
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>QUẢN LÝ NGƯỜI DÙNG</h3>
+                <span class="breadcrumb"><a asp-action="Index">Admin</a> > Tất cả người dùng</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    @if (TempData["SuccessMessage"] != null)
+    {
+        <div class="alert alert-success fw-bold mb-4" style="border-radius: 10px;">
+            <i class="fa fa-check-circle me-2"></i> @TempData["SuccessMessage"]
+        </div>
+    }
+    @if (TempData["ErrorMessage"] != null)
+    {
+        <div class="alert alert-danger fw-bold mb-4" style="border-radius: 10px;">
+            <i class="fa fa-exclamation-triangle me-2"></i> @TempData["ErrorMessage"]
+        </div>
+    }
+
+    <div class="bg-white p-4" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+        <div class="table-responsive">
+            <table class="table align-middle table-hover m-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Người dùng</th>
+                        <th>Email</th>
+                        <th>Trạng thái</th>
+                        <th>Vai trò (Role)</th>
+                        <th class="text-end">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in Model)
+                    {
+                        bool isLocked = user.LockoutEnd != null && user.LockoutEnd > DateTimeOffset.Now;
+                        bool isCurrentAdmin = User.Identity?.Name == user.Email;
+                        string displayName = !string.IsNullOrEmpty(user.FullName) ? user.FullName : user.Email;
+
+                        // Lấy Quyền từ biến RAM siêu tốc đã truyền từ Controller sang
+                        var currentRole = ViewBag.UserRoleMap != null && ViewBag.UserRoleMap.ContainsKey(user.Id)
+                        ? ViewBag.UserRoleMap[user.Id] : "User";
+
+                        <tr>
+                            <td class="fw-bold">
+                                <img src="@(string.IsNullOrEmpty(user.AvatarUrl) ? $"https://ui-avatars.com/api/?name={displayName}&background=random&color=fff&size=35" : user.AvatarUrl)"
+                                     style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;" class="me-2"
+                                     onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=User&background=random';">
+                                @(string.IsNullOrEmpty(user.FullName) ? "Chưa cập nhật" : user.FullName)
+                            </td>
+                            <td class="text-muted">@user.Email</td>
+                            <td>
+                                @if (isLocked)
+                                {
+                                    <span class="badge bg-danger"><i class="fa fa-lock me-1"></i> Bị khóa</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success"><i class="fa fa-check-circle me-1"></i> Hoạt động</span>
+                                }
+                            </td>
+
+                            <td style="width: 250px; position: relative;">
+                                @{
+                                    var currentRoles = ViewBag.UserRoleMap != null && ViewBag.UserRoleMap.ContainsKey(user.Id)
+                                    ? (List<string>)ViewBag.UserRoleMap[user.Id]
+                                    : new List<string> { "User" };
+                                }
+
+                                @if (isCurrentAdmin)
+                                {
+                                    <span class="badge bg-primary w-100 py-2" style="font-size: 13px;"><i class="fa fa-shield-alt me-1"></i> Super Admin</span>
+                                }
+                                else
+                                {
+                                    <form asp-action="UpdateRoles" method="post" class="m-0">
+                                        <input type="hidden" name="userId" value="@user.Id" />
+                                        <div class="custom-dropdown-container">
+                                            <button type="button" class="btn btn-sm btn-outline-primary w-100 text-start d-flex justify-content-between align-items-center role-toggle-btn" style="border-radius: 8px; padding: 6px 12px; background: white;">
+                                                <span class="text-truncate fw-bold" style="max-width: 170px;">
+                                                    @(string.Join(", ", currentRoles))
+                                                </span>
+                                                <i class="fa fa-chevron-down ms-1" style="font-size: 10px;"></i>
+                                            </button>
+
+                                            <div class="role-dropdown-menu position-absolute bg-white shadow-lg p-3" style="display: none; z-index: 9999; min-width: 240px; border-radius: 12px; border: 1px solid #ddd; top: 100%; left: 10px; margin-top: 5px;">
+                                                <h6 class="text-dark fw-bold mb-3 border-bottom pb-2">Tick chọn vai trò:</h6>
+
+                                                @{
+                                                    var availableRoles = new Dictionary<string, string> {
+                                                                                {"User", "👤 User (Thường)"},
+                                                                                {"Player", "🏃 Player (Cầu thủ)"},
+                                                                                {"Manager", "👔 Manager (Bầu đội)"},
+                                                                                {"Organizer", "📋 Organizer (BTC)"},
+                                                                                {"Referee", "⚖️ Referee (Trọng tài)"},
+                                                                                {"Admin", "🛡️ Admin (Quản trị)"}
+                                                                                };
+                                                }
+
+                                                @foreach (var r in availableRoles)
+                                                {
+                                                    <div class="form-check mb-2">
+                                                        <input class="form-check-input role-checkbox" type="checkbox" name="newRoles" value="@r.Key"
+                                                               id="role_@(user.Id)_@r.Key" @(currentRoles.Contains(r.Key) ? "checked" : "")>
+                                                        <label class="form-check-label text-dark" style="font-size: 14px; cursor: pointer; user-select: none;" for="role_@(user.Id)_@r.Key">
+                                                            @r.Value
+                                                        </label>
+                                                    </div>
+                                                }
+                                                <hr class="my-3">
+                                                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold" style="border-radius: 8px;">
+                                                    <i class="fa fa-save me-1"></i> Lưu thay đổi
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                }
+                            </td>
+
+                            <td class="text-end">
+                                @if (!isCurrentAdmin && !isLocked)
+                                {
+                                    <form asp-action="DeleteUser" method="post" onsubmit="return confirm('⚠️ Hành động này sẽ KHÓA tài khoản. Bạn có chắc chắn?');">
+                                        <input type="hidden" name="id" value="@user.Id" />
+                                        <button type="submit" class="btn btn-sm btn-outline-danger fw-bold">
+                                            <i class="fa fa-ban"></i> Khóa TK
+                                        </button>
+                                    </form>
+                                }
+                                else if (isLocked)
+                                {
+                                    <button class="btn btn-sm btn-secondary fw-bold" disabled>
+                                        <i class="fa fa-lock"></i> Đã khóa
+                                    </button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            // Khi bấm vào nút thì mở/đóng menu xổ xuống
+            $('.role-toggle-btn').click(function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                // Đóng các menu khác đang mở
+                $('.role-dropdown-menu').not($(this).next('.role-dropdown-menu')).fadeOut(150);
+
+                // Bật/tắt menu của nút đang bấm
+                $(this).next('.role-dropdown-menu').fadeToggle(150);
+            });
+
+            // Ngăn chặn việc bấm vào bên trong menu làm menu bị tắt
+            $('.role-dropdown-menu').click(function (e) {
+                e.stopPropagation();
+            });
+
+            // Bấm ra ngoài khoảng trắng thì tự động tắt hết menu
+            $(document).click(function () {
+                $('.role-dropdown-menu').fadeOut(150);
+            });
+        });
+    </script>
+}

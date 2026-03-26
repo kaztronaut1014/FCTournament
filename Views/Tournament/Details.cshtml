@@ -1,0 +1,905 @@
+﻿@model FCTournament.Models.Tournament
+@using Microsoft.AspNetCore.Identity
+@using FCTournament.Models
+@using FCTournament.Repository
+
+@inject UserManager<ApplicationUser> UserManager
+@inject ITeamRepository TeamRepo
+@inject EFManagerRepository ManagerRepo
+@inject IMatchRepository MatchRepo
+
+@{
+    ViewData["Title"] = "Chi tiết Giải đấu";
+    var currentUserId = UserManager.GetUserId(User);
+
+    var isManager = await ManagerRepo.GetManagerByUserIdAsync(currentUserId) != null;
+    bool isOrganizer = currentUserId != null && currentUserId == Model.ApplicationUserId;
+
+    List<Team> myTeams = new List<Team>();
+    if (isManager && currentUserId != null)
+    {
+        var allMyTeams = await TeamRepo.GetTeamsByUserIdAsync(currentUserId);
+        myTeams = allMyTeams.Where(t => !Model.TournamentTeams.Any(tt => tt.TeamId == t.Id)).ToList();
+    }
+
+    var matches = await MatchRepo.GetMatchesByTournamentAsync(Model.Id);
+    bool hasScores = matches != null && matches.Any(m => m.StatusId == 2 || m.StatusId == 3);
+
+    var standings = new List<TeamStanding>();
+    if (Model.TournamentTeams != null)
+    {
+        foreach (var tt in Model.TournamentTeams.Where(x => !Model.needApproved || x.IsApproved))
+        {
+            var st = new TeamStanding { TournamentTeam = tt };
+            if (matches != null)
+            {
+                foreach (var m in matches.Where(x => (x.StatusId == 2 || x.StatusId == 3) && (x.HomeId == tt.TeamId || x.AwayId == tt.TeamId)))
+                {
+                    st.Played++;
+                    bool isHome = m.HomeId == tt.TeamId;
+                    var homeStats = m.MatchStats?.FirstOrDefault(ms => ms.TeamId == m.HomeId);
+                    var awayStats = m.MatchStats?.FirstOrDefault(ms => ms.TeamId == m.AwayId);
+
+                    int homeGoals = homeStats?.Goals ?? 0;
+                    int awayGoals = awayStats?.Goals ?? 0;
+                    int teamGoals = isHome ? homeGoals : awayGoals;
+                    int oppGoals = isHome ? awayGoals : homeGoals;
+
+                    st.GoalsFor += teamGoals;
+                    st.GoalsAgainst += oppGoals;
+
+                    if (teamGoals > oppGoals) { st.Won++; st.Points += 3; }
+                    else if (teamGoals == oppGoals) { st.Drawn++; st.Points += 1; }
+                    else { st.Lost++; }
+                }
+            }
+            standings.Add(st);
+        }
+        standings = standings.OrderByDescending(s => s.Points).ThenByDescending(s => s.GoalDifference).ThenByDescending(s => s.GoalsFor).ToList();
+    }
+}
+
+<style>
+    #tournamentTab .nav-link {
+        color: #888;
+        border-bottom: 3px solid transparent !important;
+        background: none;
+        transition: 0.3s;
+    }
+
+        #tournamentTab .nav-link:hover {
+            color: #ee626b;
+        }
+
+        #tournamentTab .nav-link.active {
+            color: #222 !important;
+            border-bottom: 3px solid #ee626b !important;
+        }
+</style>
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Chi tiết giải đấu</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > <a asp-action="Index">Giải đấu</a> > @Model.Name</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section tournament-details py-5" style="background-color: #fcfcfc; font-family: 'Poppins', sans-serif;">
+    <div class="container">
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success text-center fw-bold mb-4" style="border-radius: 15px;">@TempData["SuccessMessage"]</div>
+        }
+        @if (TempData["ErrorMessage"] != null)
+        {
+            <div class="alert alert-danger text-center fw-bold mb-4" style="border-radius: 15px;">@TempData["ErrorMessage"]</div>
+        }
+
+        <div class="row align-items-center mb-4 p-4" style="background: #fff; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+            <div class="col-auto">
+                <img src="@(string.IsNullOrEmpty(Model.LogoUrl) ? "/assets/images/default-avatar.png" : Model.LogoUrl)" style="width: 100px; height: 100px; border-radius: 50%; border: 4px solid #ee626b; object-fit: cover;">
+            </div>
+            <div class="col">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <h2 class="fw-bold m-0" style="color: #222;">@Model.Name</h2>
+
+                    @if (Model.IsFinished)
+                    {
+                        <span class="badge bg-secondary fs-6" style="border-radius: 10px;"><i class="fa fa-lock me-1"></i> Đã kết thúc</span>
+                        if (isOrganizer)
+                        {
+                            <form asp-controller="Tournament" asp-action="ReopenTournament" asp-route-id="@Model.Id" method="post" class="m-0" onsubmit="return confirm('Bạn có chắc chắn muốn MỞ LẠI giải đấu này?');">
+                                <button type="submit" class="btn btn-sm btn-outline-success fw-bold" style="border-radius: 10px;"><i class="fa fa-unlock me-1"></i> Mở lại giải</button>
+                            </form>
+                        }
+                    }
+                    else if (Model.IsStarted)
+                    {
+                        <span class="badge bg-danger fs-6" style="border-radius: 10px;"><i class="fa fa-play-circle me-1"></i> Đang diễn ra</span>
+                        if (isOrganizer)
+                        {
+                            <form asp-controller="Tournament" asp-action="FinishTournament" asp-route-id="@Model.Id" method="post" class="m-0" onsubmit="return confirm('⚠️ Chú ý: KẾT THÚC mùa giải ngay bây giờ?');">
+                                <button type="submit" class="btn btn-sm btn-warning fw-bold" style="border-radius: 10px; color: #222;"><i class="fa fa-flag-checkered me-1"></i> Kết thúc giải</button>
+                            </form>
+                        }
+                    }
+                    else
+                    {
+                        <span class="badge bg-primary fs-6" style="border-radius: 10px;"><i class="fa fa-clock me-1"></i> Sắp diễn ra</span>
+                        if (isOrganizer)
+                        {
+                            <form asp-controller="Tournament" asp-action="StartTournament" asp-route-id="@Model.Id" method="post" class="m-0" onsubmit="return confirm('🚀 BẮT ĐẦU GIẢI ĐẤU? Sau khi bắt đầu sẽ không thể nhận thêm đội hay cho phép đội rời giải.');">
+                                <button type="submit" class="btn btn-sm btn-success fw-bold" style="border-radius: 10px;"><i class="fa fa-rocket me-1"></i> Bắt đầu giải ngay</button>
+                            </form>
+                        }
+                    }
+                </div>
+                <div class="d-flex gap-3">
+                    <span style="color: #ee626b; font-weight: 600;"><i class="fa fa-user-circle me-1"></i> BTC: @Model.Organizer</span>
+                    <span class="text-muted"><i class="fa fa-map-marker-alt me-1"></i> @(Model.Location?.Name ?? "Toàn quốc")</span>
+                </div>
+            </div>
+        </div>
+
+        <ul class="nav nav-tabs border-0 mb-4 justify-content-center" id="tournamentTab" role="tablist">
+            <li class="nav-item"><button class="nav-link active fw-bold px-4 py-3 border-0" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview">TỔNG QUAN</button></li>
+            <li class="nav-item"><button class="nav-link fw-bold px-4 py-3 border-0" id="matches-tab" data-bs-toggle="tab" data-bs-target="#matches">LỊCH THI ĐẤU</button></li>
+            <li class="nav-item"><button class="nav-link fw-bold px-4 py-3 border-0" id="standings-tab" data-bs-toggle="tab" data-bs-target="#standings">DANH SÁCH ĐỘI / BXH</button></li>
+            @if (isOrganizer)
+            {
+                <li class="nav-item"><button class="nav-link fw-bold px-4 py-3 border-0" id="settings-tab" data-bs-toggle="tab" data-bs-target="#settings"><i class="fa fa-cog text-danger me-1"></i> XẾP LỊCH THI ĐẤU</button></li>
+            }
+            @if (isOrganizer && (Model.needApproved || Model.TournamentTeams.Any(tt => !tt.IsApproved)))
+            {
+                <li class="nav-item">
+                    <button class="nav-link fw-bold px-4 py-3 border-0" id="requests-tab" data-bs-toggle="tab" data-bs-target="#requests">
+                        <i class="fa fa-user-plus text-warning me-1"></i> YÊU CẦU DUYỆT
+                        <span class="badge bg-danger">@Model.TournamentTeams.Count(tt => !tt.IsApproved)</span>
+                    </button>
+                </li>
+            }
+        </ul>
+
+        <div class="tab-content" id="tournamentTabContent">
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="p-4 bg-white h-100" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                            <h5 class="fw-bold mb-3" style="color: #ee626b;">Mô tả giải đấu</h5>
+                            <p class="text-muted" style="line-height: 1.8;">@Model.Description</p><hr>
+                            <h5 class="fw-bold mb-3" style="color: #ee626b;">Quy định & Luật thi đấu</h5>
+                            <p class="text-muted" style="white-space: pre-line; line-height: 1.8;">@Model.Rules</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-4">
+                        <div class="p-4 bg-white h-100" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                            <h5 class="fw-bold mb-4 border-bottom pb-2">Thông số giải đấu</h5>
+                            <div class="mb-3 d-flex justify-content-between"><span class="text-muted">Thể thức:</span><span class="fw-bold">@(Model.Format?.Name ?? "Vòng tròn")</span></div>
+                            <div class="mb-3 d-flex justify-content-between"><span class="text-muted">Loại sân:</span><span class="fw-bold">@(Model.Type?.Name ?? "Sân 7")</span></div>
+                            <div class="mb-3 d-flex justify-content-between"><span class="text-muted">Quy mô:</span><span class="fw-bold">@Model.Size Đội bóng</span></div>
+                            <div class="mb-3 d-flex justify-content-between"><span class="text-muted">Lệ phí:</span><span class="fw-bold text-success">@Model.Fees.ToString("N0") VNĐ</span></div>
+                            <div class="mb-3 d-flex justify-content-between">
+                                <span class="text-muted">Kiểm duyệt:</span>
+                                <span class="fw-bold">@(Model.needApproved ? "Bật" : "Tắt")</span>
+                            </div>
+                            <div class="mb-0 d-flex justify-content-between"><span class="text-muted">Đã tham gia:</span><span class="fw-bold text-primary">@Model.TournamentTeams.Count(tt => !Model.needApproved || tt.IsApproved) / @Model.Size Đội</span></div>
+                            
+                            @if (!Model.IsStarted && !Model.IsFinished && isManager && myTeams.Any() && Model.TournamentTeams.Count(tt => !Model.needApproved || tt.IsApproved) < Model.Size)
+                            {
+                                <button type="button" class="btn fw-bold w-100 py-3 mt-4" data-bs-toggle="modal" data-bs-target="#registerTournamentModal" style="background-color: #ee626b; color: white; border-radius: 15px;">ĐĂNG KÝ THAM GIA</button>
+                            }
+                            else if (Model.IsStarted && !Model.IsFinished && isManager)
+                            {
+                                <div class="alert alert-warning mt-4 text-center mb-0" style="border-radius: 10px;">Giải đấu đã khởi tranh. Không thể đăng ký thêm!</div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @if (!Model.IsStarted && !Model.IsFinished)
+            {
+                <div class="modal fade" id="registerTournamentModal" tabindex="-1">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content" style="border-radius: 20px;">
+                            <div class="modal-body p-4">
+                                <h5 class="fw-bold mb-3">Chọn đội bóng thi đấu</h5>
+                                <form asp-controller="Tournament" asp-action="RegisterTeam" method="post">
+                                    <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                    <select name="teamId" class="form-select form-select-lg mb-3" style="border-radius: 15px;" required>
+                                        <option value="">-- Vui lòng chọn 1 đội --</option>
+                                        @foreach (var t in myTeams)
+                                        {
+                                            <option value="@t.Id">@t.FullName</option>
+                                        }
+                                    </select>
+                                    <button type="submit" class="btn w-100 py-3 fw-bold btn-primary" style="border-radius: 15px;">Xác nhận Ghi danh</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <div class="tab-pane fade" id="matches" role="tabpanel">
+                @if (matches != null && matches.Any())
+                {
+                    var groupedMatches = matches.GroupBy(m => m.Round).OrderBy(g => g.Key).ToList();
+                    foreach (var roundGroup in groupedMatches)
+                    {
+                        <h5 class="fw-bold mt-4 mb-3" style="color: #008af8; border-left: 4px solid #008af8; padding-left: 10px; background-color: #e6f3ff; padding: 10px; border-radius: 0 10px 10px 0;">
+                            VÒNG @roundGroup.Key
+                            @if (Model.FormatId == 2 || Model.Format?.Name == "Knockout")
+                            {
+                                <span class="badge bg-danger ms-2" style="font-size: 12px;">Loại trực tiếp</span>
+                            }
+                        </h5>
+                        <div class="row g-3">
+                            @foreach (var match in roundGroup)
+                            {
+                                <div class="col-md-6">
+                                    @{
+                                        // THUẬT TOÁN TÍNH TỔNG TỈ SỐ 2 LƯỢT
+                                        var firstLeg = matches.FirstOrDefault(m => m.Round < match.Round &&
+                                        ((m.HomeId == match.HomeId && m.AwayId == match.AwayId) ||
+                                        (m.HomeId == match.AwayId && m.AwayId == match.HomeId)));
+
+                                        int aggHome = 0;
+                                        int aggAway = 0;
+                                        bool isSecondLeg = firstLeg != null;
+
+                                        if (isSecondLeg && firstLeg.StatusId == 3)
+                                        {
+                                            int pHomeGoals = firstLeg.MatchStats?.FirstOrDefault(ms => ms.TeamId == firstLeg.HomeId)?.Goals ?? 0;
+                                            int pAwayGoals = firstLeg.MatchStats?.FirstOrDefault(ms => ms.TeamId == firstLeg.AwayId)?.Goals ?? 0;
+
+                                            if (firstLeg.HomeId == match.HomeId) { aggHome += pHomeGoals; aggAway += pAwayGoals; }
+                                            else { aggHome += pAwayGoals; aggAway += pHomeGoals; }
+                                        }
+
+                                        var homeStats = match.MatchStats?.FirstOrDefault(ms => ms.TeamId == match.HomeId);
+                                        var awayStats = match.MatchStats?.FirstOrDefault(ms => ms.TeamId == match.AwayId);
+                                        string homeScore = homeStats != null ? homeStats.Goals.ToString() : "-";
+                                        string awayScore = awayStats != null ? awayStats.Goals.ToString() : "-";
+
+                                        int currHomeGoals = homeStats?.Goals ?? 0;
+                                        int currAwayGoals = awayStats?.Goals ?? 0;
+
+                                        if (match.StatusId == 3)
+                                        {
+                                            aggHome += currHomeGoals;
+                                            aggAway += currAwayGoals;
+                                        }
+
+                                        bool isTiedAggregate = (isSecondLeg && match.StatusId == 3 && aggHome == aggAway);
+
+                                        int currentStatus = match.StatusId;
+                                        if (currentStatus == 1 && DateTime.Now >= match.StartDate) { currentStatus = 2; }
+                                        string statusColor = currentStatus == 3 ? "bg-success" : (currentStatus == 2 ? "bg-warning text-dark" : "bg-secondary");
+                                        string statusName = currentStatus == 3 ? "Kết thúc" : (currentStatus == 2 ? "Đang diễn ra" : "Sắp tới");
+
+                                        var homeGroups = match.MatchDetails?.Where(md => new[] { 3, 5, 6, 7 }.Contains(md.ProgressId) && match.Home.Players.Any(p => p.Id == md.PlayerId))
+                                        .GroupBy(e => new { e.PlayerId, e.ProgressId }).Select(g => new
+                                        {
+                                            PlayerName = string.IsNullOrEmpty(g.First().Player?.NickName) ? g.First().Player?.User?.FullName : g.First().Player?.NickName,
+                                            Minutes = string.Join(", ", g.OrderBy(x => x.Time).Select(x => x.Time + "'")),
+                                            Icon = g.Key.ProgressId == 3 ? "⚽" : (g.Key.ProgressId == 5 ? "⚽ <small class='text-danger'>(OG)</small>" : (g.Key.ProgressId == 6 ? "🟨" : "🟥"))
+                                        }).ToList();
+
+                                        var awayGroups = match.MatchDetails?.Where(md => new[] { 3, 5, 6, 7 }.Contains(md.ProgressId) && match.Away.Players.Any(p => p.Id == md.PlayerId))
+                                        .GroupBy(e => new { e.PlayerId, e.ProgressId }).Select(g => new
+                                        {
+                                            PlayerName = string.IsNullOrEmpty(g.First().Player?.NickName) ? g.First().Player?.User?.FullName : g.First().Player?.NickName,
+                                            Minutes = string.Join(", ", g.OrderBy(x => x.Time).Select(x => x.Time + "'")),
+                                            Icon = g.Key.ProgressId == 3 ? "⚽" : (g.Key.ProgressId == 5 ? "<small class='text-danger'>(OG)</small> ⚽" : (g.Key.ProgressId == 6 ? "🟨" : "🟥"))
+                                        }).ToList();
+                                    }
+
+                                    <div class="p-3 bg-white shadow-sm" style="border-radius: 15px; border: 1px solid #eee; position: relative;">
+                                        @if (isOrganizer)
+                                        {
+                                            <button class="btn btn-sm btn-light position-absolute top-0 end-0 m-2" data-bs-toggle="modal" data-bs-target="#scoreModal-@match.Id" style="border-radius: 10px; z-index: 10;"><i class="fa fa-pencil-alt text-primary"></i></button>
+                                        }
+
+                                        <div class="d-flex align-items-center justify-content-between mb-2">
+                                            <div class="text-start" style="flex: 1;">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <img src="@(string.IsNullOrEmpty(match.Home?.Logo) ? "/assets/images/default-avatar.png" : match.Home?.Logo)" style="width: 25px; height: 25px; border-radius: 50%; margin-right: 10px; object-fit: cover;">
+                                                    <span class="fw-bold @(homeScore != "-" && homeScore.CompareTo(awayScore) > 0 ? "text-danger" : "")">@match.Home?.FullName</span>
+                                                </div>
+                                                <div class="d-flex align-items-center">
+                                                    <img src="@(string.IsNullOrEmpty(match.Away?.Logo) ? "/assets/images/default-avatar.png" : match.Away?.Logo)" style="width: 25px; height: 25px; border-radius: 50%; margin-right: 10px; object-fit: cover;">
+                                                    <span class="fw-bold @(awayScore != "-" && awayScore.CompareTo(homeScore) > 0 ? "text-danger" : "")">@match.Away?.FullName</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="text-center px-3" style="min-width: 120px;">
+                                                @if (match.StatusId == 3)
+                                                {
+                                                    <h3 class="fw-bold m-0" style="color: #222;">@currHomeGoals - @currAwayGoals</h3>
+                                                    if (isSecondLeg)
+                                                    {
+                                                        <div class="badge bg-dark mt-1 px-2 py-1" style="font-size: 11px;">Tổng: @aggHome - @aggAway</div>
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    <h3 class="fw-bold m-0 text-muted">- : -</h3>
+                                                    if (isSecondLeg && firstLeg?.StatusId == 3)
+                                                    {
+                                                        <div class="badge mt-1" style="background-color: #e6f3ff; color: #008af8;">Lượt đi: @aggHome - @aggAway</div>
+                                                    }
+                                                }
+                                            </div>
+
+                                            <div class="text-center px-2 border-start ms-2" style="min-width: 90px;">
+                                                <span class="d-block fw-bold text-primary" style="font-size: 14px;">@match.StartDate.ToString("HH:mm")</span>
+                                                <span style="font-size: 11px; color: #888;">@match.StartDate.ToString("dd/MM/yyyy")</span>
+                                                <span class="badge @statusColor mt-1" style="font-size: 10px;">@statusName</span>
+                                            </div>
+                                        </div>
+
+                                        @if ((homeGroups != null && homeGroups.Any()) || (awayGroups != null && awayGroups.Any()))
+                                        {
+                                            <div class="row mt-2 border-top pt-2 mx-0" style="font-size: 12px;">
+                                                <div class="col-5 text-end text-muted px-1">
+                                                    @if (homeGroups != null)
+                                                    {
+                                                        foreach (var g in homeGroups)
+                                                        {
+                                                            <div>@g.Minutes - @g.PlayerName @Html.Raw(g.Icon)</div>
+                                                        }
+                                                    }
+                                                </div>
+                                                <div class="col-2 text-center text-light px-0" style="font-size: 10px;">VS</div>
+                                                <div class="col-5 text-start text-muted px-1">
+                                                    @if (awayGroups != null)
+                                                    {
+                                                        foreach (var g in awayGroups)
+                                                        {
+                                                            <div>@Html.Raw(g.Icon) @g.Minutes - @g.PlayerName</div>
+                                                        }
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+
+                                        @if (isTiedAggregate && isOrganizer)
+                                        {
+                                            <div class="col-12 mt-3">
+                                                @if (match.AdvancingTeamId == null || match.AdvancingTeamId == 0)
+                                                {
+                                                    <div class="p-3 bg-warning bg-opacity-10 border border-warning rounded text-center">
+                                                        <span class="text-warning fw-bold d-block mb-2"><i class="fa fa-balance-scale"></i> TỔNG TỈ SỐ ĐANG HÒA!</span>
+                                                        <p class="small text-muted mb-2">Vui lòng phân định đội đi tiếp (Penalty/Luật sân khách):</p>
+
+                                                        <form asp-action="ResolveTie" method="post" class="d-inline">
+                                                            <input type="hidden" name="matchId" value="@match.Id" />
+                                                            <input type="hidden" name="advancingTeamId" value="@match.HomeId" />
+                                                            <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark">Cho @match.Home?.ShortName đi tiếp</button>
+                                                        </form>
+                                                        <span class="mx-2 fw-bold text-muted">HOẶC</span>
+                                                        <form asp-action="ResolveTie" method="post" class="d-inline">
+                                                            <input type="hidden" name="matchId" value="@match.Id" />
+                                                            <input type="hidden" name="advancingTeamId" value="@match.AwayId" />
+                                                            <button type="submit" class="btn btn-sm btn-warning fw-bold text-dark">Cho @match.Away?.ShortName đi tiếp</button>
+                                                        </form>
+                                                    </div>
+                                                }
+                                                else
+                                                {
+                                                    var advancingName = match.AdvancingTeamId == match.HomeId ? match.Home?.ShortName : match.Away?.ShortName;
+                                                    <div class="text-center mt-2">
+                                                        <span class="badge bg-success p-2"><i class="fa fa-check-circle me-1"></i> @advancingName thắng Tie-break</span>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+
+                                    </div>
+
+                                    @if (isOrganizer)
+                                    {
+                                        <div class="modal fade" id="scoreModal-@match.Id" tabindex="-1">
+                                            <div class="modal-dialog modal-dialog-centered modal-lg">
+                                                <div class="modal-content" style="border-radius: 15px;">
+                                                    <div class="modal-header bg-light">
+                                                        <h6 class="modal-title fw-bold">Cập nhật trận đấu</h6>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <form asp-controller="Tournament" asp-action="UpdateScore" method="post" onsubmit="submitScoreAJAX(event, @match.Id)">
+                                                            <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                                            <input type="hidden" name="matchId" value="@match.Id" />
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label text-muted fw-bold" style="font-size: 13px;">Trạng thái trận đấu</label>
+                                                                <select name="statusId" class="form-select border-primary" style="background-color: #f0f8ff;">
+                                                                    <option value="1" selected="@(match.StatusId == 1)">Not Started (Chưa đá)</option>
+                                                                    <option value="2" selected="@(match.StatusId == 2)">Ongoing (Đang đá)</option>
+                                                                    <option value="3" selected="@(match.StatusId == 3)">Finished (Kết thúc)</option>
+                                                                </select>
+                                                            </div>
+
+                                                            <div class="d-flex justify-content-between align-items-start mb-4">
+                                                                <div class="text-center" style="width: 48%;">
+                                                                    <span class="badge bg-danger mb-2">ĐỘI NHÀ</span>
+                                                                    <img src="@(string.IsNullOrEmpty(match.Home?.Logo) ? $"/assets/images/default-avatar.png" : match.Home?.Logo)" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                                                                    <small class="d-block fw-bold mt-1 text-truncate">@match.Home?.ShortName</small>
+                                                                    <input type="number" name="homeGoals" class="form-control text-center fs-4 fw-bold mt-2" value="@(homeScore != "-" ? homeScore : "0")" min="0" required>
+                                                                    <div id="homeEventsList-@match.Id" class="mt-2 text-start">
+                                                                        @if (match.MatchDetails != null)
+                                                                        {
+                                                                            foreach (var ev in match.MatchDetails.Where(md => match.Home.Players.Any(p => p.Id == md.PlayerId)).OrderBy(md => md.Time))
+                                                                            {
+                                                                                if (new[] { 3, 5, 6, 7 }.Contains(ev.ProgressId))
+                                                                                {
+                                                                                    <div class="d-flex gap-2 mt-2 event-row align-items-center">
+                                                                                        <select name="homePlayerIds[]" class="form-select form-select-sm" style="font-size: 13px; flex: 1;">
+                                                                                            @if (match.Home?.Players != null)
+                                                                                            {
+                                                                                                foreach (var p in match.Home.Players)
+                                                                                                {
+                                                                                                    <option value="@p.Id" selected="@(p.Id == ev.PlayerId)">@(string.IsNullOrEmpty(p.NickName) ? p.User?.FullName : p.NickName)</option>
+                                                                                                }
+                                                                                            }
+                                                                                        </select>
+                                                                                        <select name="homeProgressIds[]" class="form-select form-select-sm" style="font-size: 13px; width: 90px;">
+                                                                                            <option value="3" selected="@(ev.ProgressId == 3)">⚽ Bàn</option>
+                                                                                            <option value="5" selected="@(ev.ProgressId == 5)">⚽ OG</option>
+                                                                                            <option value="6" selected="@(ev.ProgressId == 6)">🟨 Vàng</option>
+                                                                                            <option value="7" selected="@(ev.ProgressId == 7)">🟥 Đỏ</option>
+                                                                                        </select>
+                                                                                        <input type="number" name="homeMinutes[]" class="form-control form-control-sm text-center" value="@ev.Time" style="width: 60px; font-size: 13px;" required>
+                                                                                        <button type="button" class="btn btn-sm text-danger" onclick="this.parentElement.remove()"><i class="fa fa-times fs-5"></i></button>
+                                                                                    </div>
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    </div>
+                                                                    <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-3 py-2 fw-bold" onclick="addEventRow(@match.Id, 'home', @match.HomeId)">+ Thêm Diễn biến</button>
+                                                                </div>
+
+                                                                <div class="fw-bold text-muted fs-5 mt-5">-</div>
+
+                                                                <div class="text-center" style="width: 48%;">
+                                                                    <span class="badge bg-primary mb-2">ĐỘI KHÁCH</span>
+                                                                    <img src="@(string.IsNullOrEmpty(match.Away?.Logo) ? $"/assets/images/default-avatar.png" : match.Away?.Logo)" style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover;">
+                                                                    <small class="d-block fw-bold mt-1 text-truncate">@match.Away?.ShortName</small>
+                                                                    <input type="number" name="awayGoals" class="form-control text-center fs-4 fw-bold mt-2" value="@(awayScore != "-" ? awayScore : "0")" min="0" required>
+                                                                    <div id="awayEventsList-@match.Id" class="mt-2 text-start">
+                                                                        @if (match.MatchDetails != null)
+                                                                        {
+                                                                            foreach (var ev in match.MatchDetails.Where(md => match.Away.Players.Any(p => p.Id == md.PlayerId)).OrderBy(md => md.Time))
+                                                                            {
+                                                                                if (new[] { 3, 5, 6, 7 }.Contains(ev.ProgressId))
+                                                                                {
+                                                                                    <div class="d-flex gap-2 mt-2 event-row align-items-center">
+                                                                                        <select name="awayPlayerIds[]" class="form-select form-select-sm" style="font-size: 13px; flex: 1;">
+                                                                                            @if (match.Away?.Players != null)
+                                                                                            {
+                                                                                                foreach (var p in match.Away.Players)
+                                                                                                {
+                                                                                                    <option value="@p.Id" selected="@(p.Id == ev.PlayerId)">@(string.IsNullOrEmpty(p.NickName) ? p.User?.FullName : p.NickName)</option>
+                                                                                                }
+                                                                                            }
+                                                                                        </select>
+                                                                                        <select name="awayProgressIds[]" class="form-select form-select-sm" style="font-size: 13px; width: 90px;">
+                                                                                            <option value="3" selected="@(ev.ProgressId == 3)">⚽ Bàn</option>
+                                                                                            <option value="5" selected="@(ev.ProgressId == 5)">⚽ OG</option>
+                                                                                            <option value="6" selected="@(ev.ProgressId == 6)">🟨 Vàng</option>
+                                                                                            <option value="7" selected="@(ev.ProgressId == 7)">🟥 Đỏ</option>
+                                                                                        </select>
+                                                                                        <input type="number" name="awayMinutes[]" class="form-control form-control-sm text-center" value="@ev.Time" style="width: 60px; font-size: 13px;" required>
+                                                                                        <button type="button" class="btn btn-sm text-danger" onclick="this.parentElement.remove()"><i class="fa fa-times fs-5"></i></button>
+                                                                                    </div>
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    </div>
+                                                                    <button type="button" class="btn btn-sm btn-outline-secondary w-100 mt-3 py-2 fw-bold" onclick="addEventRow(@match.Id, 'away', @match.AwayId)">+ Thêm Diễn biến</button>
+                                                                </div>
+                                                            </div>
+
+                                                            <select id="players-@match.HomeId" class="d-none">
+                                                                @if (match.Home?.Players != null)
+                                                                {
+                                                                    foreach (var p in match.Home.Players)
+                                                                    {
+                                                                        <option value="@p.Id">@(string.IsNullOrEmpty(p.NickName) ? p.User?.FullName : p.NickName)</option>
+                                                                    }
+                                                                }
+                                                            </select>
+                                                            <select id="players-@match.AwayId" class="d-none">
+                                                                @if (match.Away?.Players != null)
+                                                                {
+                                                                    foreach (var p in match.Away.Players)
+                                                                    {
+                                                                        <option value="@p.Id">@(string.IsNullOrEmpty(p.NickName) ? p.User?.FullName : p.NickName)</option>
+                                                                    }
+                                                                }
+                                                            </select>
+
+                                                            <button type="submit" class="btn btn-primary w-100 fw-bold py-2 mt-2" style="border-radius: 10px; font-size: 15px;">Lưu kết quả</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center py-5 text-muted bg-white" style="border-radius: 15px; border: 1px dashed #ddd;">
+                        <i class="fa fa-calendar-times fa-3x mb-3 opacity-50"></i>
+                        <h5>Chưa có lịch thi đấu</h5>
+                    </div>
+                }
+            </div>
+
+            <div class="tab-pane fade" id="standings" role="tabpanel">
+                <div class="table-responsive bg-white p-3" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                    <table class="table table-hover align-middle m-0" style="font-size: 14px; min-width: 800px;">
+                        <thead class="table-light">
+                            <tr class="text-center">
+                                <th style="width: 50px;">#</th>
+                                <th class="text-start">CÂU LẠC BỘ</th>
+                                <th>TRẬN</th>
+                                <th>T</th>
+                                <th>H</th>
+                                <th>B</th>
+                                <th>BT</th>
+                                <th>SBT</th>
+                                <th>HS</th>
+                                <th class="fw-bold">ĐIỂM</th>
+                                <th>HÀNH ĐỘNG</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (standings.Any())
+                            {
+                                int rank = 1;
+                                foreach (var st in standings)
+                                {
+                                    bool isThisTeamManager = (st.TournamentTeam.Team.ApplicationUserId == currentUserId);
+                                    <tr class="text-center">
+                                        <td class="fw-bold">@rank</td>
+                                        <td class="text-start">
+                                            <img src="@(string.IsNullOrEmpty(st.TournamentTeam.Team.Logo) ? $"https://ui-avatars.com/api/?name={st.TournamentTeam.Team.ShortName}&background=random&color=fff&size=30" : st.TournamentTeam.Team.Logo)" style="width: 30px; height: 30px; border-radius: 50%; margin-right: 10px; object-fit: cover;">
+                                            <a asp-controller="Team" asp-action="Details" asp-route-id="@st.TournamentTeam.TeamId" class="fw-bold text-dark text-decoration-none">@st.TournamentTeam.Team.FullName</a>
+                                        </td>
+                                        <td>@st.Played</td>
+                                        <td>@st.Won</td>
+                                        <td>@st.Drawn</td>
+                                        <td>@st.Lost</td>
+                                        <td>@st.GoalsFor</td>
+                                        <td>@st.GoalsAgainst</td>
+                                        <td class="text-muted">@(st.GoalDifference > 0 ? "+" + st.GoalDifference : st.GoalDifference.ToString())</td>
+                                        <td class="fw-bold text-primary" style="font-size: 16px;">@st.Points</td>
+                                        <td class="text-center align-middle">
+                                            @if (!Model.IsStarted && !Model.IsFinished)
+                                            {
+                                                if (isOrganizer)
+                                                {
+                                                    <form asp-controller="Tournament" asp-action="RemoveTeam" method="post" onsubmit="return confirm('Loại đội @st.TournamentTeam.Team.FullName khỏi giải?');">
+                                                        <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                                        <input type="hidden" name="teamId" value="@st.TournamentTeam.TeamId" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Xóa khỏi giải"><i class="fa fa-trash"></i></button>
+                                                    </form>
+                                                }
+                                                else if (isThisTeamManager)
+                                                {
+                                                    <form asp-controller="Tournament" asp-action="LeaveTournament" method="post" onsubmit="return confirm('Bạn chắc chắn muốn rút đội bóng khỏi giải đấu này?');">
+                                                        <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                                        <input type="hidden" name="teamId" value="@st.TournamentTeam.TeamId" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-warning fw-bold"><i class="fa fa-sign-out-alt"></i> Rời giải</button>
+                                                    </form>
+                                                }
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted" style="font-size: 12px;"><i class="fa fa-lock"></i> Đã chốt</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                    rank++;
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            @if (isOrganizer)
+            {
+                <div class="tab-pane fade" id="settings" role="tabpanel">
+                    <div class="row justify-content-center">
+                        <div class="col-lg-8">
+                            @if (hasScores)
+                            {
+                                <div class="alert alert-danger mb-4" id="lockWarning" style="border-radius: 15px;">
+                                    <h5 class="fw-bold text-danger"><i class="fa fa-lock"></i> Chức năng Xếp lịch đã bị khóa</h5>
+                                    <p class="mb-2">Hệ thống phát hiện giải đấu đã có kết quả. Việc xếp lại lịch sẽ XÓA SẠCH toàn bộ dữ liệu này.</p>
+                                    <button type="button" class="btn btn-sm btn-outline-danger fw-bold"
+                                            onclick="document.getElementById('scheduleForm').classList.remove('opacity-50'); document.getElementById('scheduleForm').style.pointerEvents='auto'; this.parentElement.style.display='none';">
+                                        Tôi hiểu rủi ro, Mở khóa Form!
+                                    </button>
+                                </div>
+
+                                @if (Model.FormatId == 2 || Model.Format?.Name == "Knockout")
+                                {
+                                    <form asp-controller="Tournament" asp-action="ScheduleNextRound" method="post" class="mb-4 p-4" style="background-color: #f0fdf4; border-radius: 15px; border: 2px dashed #16a34a;">
+                                        <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                        <h5 class="fw-bold text-success mb-2"><i class="fa fa-code-branch"></i> Bốc thăm Vòng tiếp theo</h5>
+                                        <p class="text-muted small mb-3">Hệ thống sẽ tự động quét các đội chiến thắng vòng trước để ghép cặp đá tiếp.</p>
+                                        <button type="submit" class="btn btn-success fw-bold px-4 py-2 shadow-sm" style="border-radius: 10px;"
+                                                onclick="return confirm('Bạn đã chắc chắn các trận vòng trước nhập ĐÚNG tỉ số chưa?');">
+                                            Tiến hành bốc thăm vòng mới <i class="fa fa-arrow-right ms-2"></i>
+                                        </button>
+                                    </form>
+                                }
+                            }
+
+                            <form id="scheduleForm" asp-controller="Tournament" asp-action="AutoSchedule" method="post"
+                                  class="p-4 bg-white @(hasScores ? "opacity-50" : "")"
+                                  style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); background-color: #1a1d24 !important; @(hasScores ? "pointer-events: none;" : "")"
+                                  onsubmit="return confirm('⚠️ CẢNH BÁO QUAN TRỌNG: Hành động này sẽ XÓA SẠCH toàn bộ lịch thi đấu và tỉ số hiện tại. Bạn có chắc chắn muốn tiếp tục?');">
+
+                                <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                <h4 class="fw-bold mb-4 text-white"><i class="fa fa-calendar-alt me-2 text-success"></i> Tự động xếp lịch thi đấu</h4>
+                                <div class="mb-4"><label class="form-label text-light">Ngày bắt đầu giải</label><input type="date" name="startDate" class="form-control" style="background-color: #242830; border: 1px solid #333; color: white;" value="@Model.StartDate.ToString("yyyy-MM-dd")" required></div>
+                                <div class="mb-4">
+                                    <label class="form-label text-light">Ngày thi đấu trong tuần</label>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        @foreach (var day in new[] { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" })
+                                        {
+                                            <div class="form-check"><input class="form-check-input" type="checkbox" name="playDays" value="@day" id="day_@day"><label class="form-check-label text-light" for="day_@day">@day</label></div>
+                                        }
+                                    </div>
+                                </div>
+                                <div class="row mb-4">
+                                    <div class="col-md-6"><label class="form-label text-light">Giờ bắt đầu mỗi ngày</label><input type="time" name="dailyStartTime" class="form-control" style="background-color: #242830; border: 1px solid #333; color: white;" value="18:00"></div>
+                                    <div class="col-md-6"><label class="form-label text-light">Thời gian 1 trận (phút)</label><input type="number" name="gameDuration" class="form-control" style="background-color: #242830; border: 1px solid #333; color: white;" value="60"></div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label text-light">Số trận mỗi ngày</label>
+                                    <select name="dailyGames" class="form-select" style="background-color: #242830; border: 1px solid #333; color: white;">
+                                        <option value="1">1 trận</option>
+                                        <option value="2">2 trận</option>
+                                        <option value="3" selected>3 trận</option>
+                                        <option value="4">4 trận</option>
+                                    </select>
+                                </div>
+                                @if (Model.FormatId == 3 || Model.Format?.Name == "Group Stage + Knockout")
+                                {
+                                    <div class="mb-4 p-3" style="background-color: rgba(238, 98, 107, 0.1); border-left: 4px solid #ee626b; border-radius: 8px;">
+                                        <label class="form-label text-light fw-bold">Số đội lọt vào Playoff</label>
+                                        <select name="playoffTeams" class="form-select" style="background-color: #242830; border: 1px solid #333; color: white;">
+                                            <option value="4" selected>4 Đội (Bắt đầu từ Bán kết)</option>
+                                            <option value="8">8 Đội (Bắt đầu từ Tứ kết)</option>
+                                        </select>
+                                    </div>
+                                }
+                                <button type="submit" class="btn w-100 py-3 fw-bold mt-2" style="background-color: #20c997; color: white; border-radius: 10px; font-size: 18px;">Tạo lại lịch thi đấu</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            @if (isOrganizer)
+            {
+                <div class="tab-pane fade" id="requests" role="tabpanel">
+                    <div class="bg-white p-4" style="border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05);">
+                        <h5 class="fw-bold mb-4">Danh sách đội đang chờ phê duyệt</h5>
+                        <div class="table-responsive">
+                            <table class="table align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Đội bóng</th>
+                                        <th>Ngày gửi yêu cầu</th>
+                                        <th class="text-end">Hành động</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var tt in Model.TournamentTeams.Where(x => !x.IsApproved))
+                                    {
+                                        var today = DateOnly.FromDateTime(DateTime.Now);
+                                        <tr id="request-row-@tt.TeamId">
+                                            <td>
+                                                <img src="@(string.IsNullOrEmpty(tt.Team?.Logo) ? "/assets/images/default-avatar.png" : tt.Team.Logo)"
+                                                     style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; border: 1px solid #eee;"
+                                                     class="me-2"
+                                                     onerror="this.src='/assets/images/default-avatar.png';"> <span class="fw-bold">@tt.Team?.FullName</span>
+                                            </td>
+                                            <td><small class="text-muted">@today</small></td>
+                                            <td class="text-end">
+                                                <div class="d-flex justify-content-end gap-2">
+                                                    <form asp-action="ApproveTeam" method="post" class="ajax-approve-form" data-teamid="@tt.TeamId">
+                                                        <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                                        <input type="hidden" name="teamId" value="@tt.TeamId" />
+                                                        <button type="submit" class="btn btn-sm btn-success fw-bold"><i class="fa fa-check me-1"></i>Duyệt</button>
+                                                    </form>
+
+                                                    <form asp-action="RemoveTeam" method="post" class="ajax-reject-form" data-teamid="@tt.TeamId">
+                                                        <input type="hidden" name="tournamentId" value="@Model.Id" />
+                                                        <input type="hidden" name="teamId" value="@tt.TeamId" />
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger fw-bold"><i class="fa fa-times me-1"></i>Từ chối</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                    @if (!Model.TournamentTeams.Any(tt => !tt.IsApproved))
+                                    {
+                                        <tr><td colspan="3" class="text-center text-muted py-4">Không có yêu cầu nào đang chờ.</td></tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@functions {
+    public class TeamStanding
+    {
+        public TournamentTeam TournamentTeam { get; set; }
+        public int Played { get; set; }
+        public int Won { get; set; }
+        public int Drawn { get; set; }
+        public int Lost { get; set; }
+        public int GoalsFor { get; set; }
+        public int GoalsAgainst { get; set; }
+        public int GoalDifference => GoalsFor - GoalsAgainst;
+        public int Points { get; set; }
+    }
+}
+
+@section Scripts {
+    <script>
+        function addEventRow(matchId, side, teamId) {
+            const container = document.getElementById(`${side}EventsList-${matchId}`);
+            const options = document.getElementById(`players-${teamId}`).innerHTML;
+            const html = `
+                <div class="d-flex gap-2 mt-2 event-row align-items-center">
+                    <select name="${side}PlayerIds[]" class="form-select form-select-sm" style="font-size: 13px; flex: 1;">${options}</select>
+                    <select name="${side}ProgressIds[]" class="form-select form-select-sm" style="font-size: 13px; width: 90px;">
+                        <option value="3">⚽ Bàn</option><option value="5">⚽ OG</option><option value="6">🟨 Vàng</option><option value="7">🟥 Đỏ</option>
+                    </select>
+                    <input type="number" name="${side}Minutes[]" class="form-control form-control-sm text-center" placeholder="Phút" style="width: 60px; font-size: 13px;" required>
+                    <button type="button" class="btn btn-sm text-danger px-2" onclick="this.parentElement.remove()"><i class="fa fa-times fs-5"></i></button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', html);
+        }
+
+        async function submitScoreAJAX(event, matchId) {
+            event.preventDefault();
+            const form = event.target;
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            submitBtn.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Đang lưu...';
+            submitBtn.disabled = true;
+            try {
+                const response = await fetch(form.action, { method: 'POST', body: new FormData(form) });
+                if (response.ok) {
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const newDoc = parser.parseFromString(html, 'text/html');
+
+                    const modalEl = document.getElementById(`scoreModal-${matchId}`);
+                    if (modalEl) {
+                        const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                        modalInstance.hide();
+                    }
+
+                    setTimeout(() => {
+                        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.overflow = '';
+                        document.body.style.paddingRight = '';
+
+                        document.getElementById('matches').innerHTML = newDoc.getElementById('matches').innerHTML;
+                        document.getElementById('standings').innerHTML = newDoc.getElementById('standings').innerHTML;
+                    }, 300);
+
+                } else {
+                     alert("❌ Lỗi xử lý từ server!");
+                     submitBtn.innerHTML = 'Lưu kết quả';
+                     submitBtn.disabled = false;
+                }
+            } catch (error) {
+                console.error("Lỗi:", error);
+                alert("❌ Lỗi đường truyền!");
+                submitBtn.innerHTML = 'Lưu kết quả';
+                submitBtn.disabled = false;
+            }
+        }
+
+        let isTyping = false;
+        document.addEventListener('show.bs.modal', function () { isTyping = true; });
+        document.addEventListener('hidden.bs.modal', function () { isTyping = false; });
+        setInterval(async () => {
+            if (isTyping) return;
+            try {
+                const currentUrl = new URL(window.location.href);
+                currentUrl.searchParams.set('nocache', new Date().getTime());
+                const response = await fetch(currentUrl.toString(), { cache: 'no-store' });
+
+                if (response.ok) {
+                    const html = await response.text();
+                    const parser = new DOMParser();
+                    const newDoc = parser.parseFromString(html, 'text/html');
+
+                    const oldMatches = document.getElementById('matches');
+                    const oldStandings = document.getElementById('standings');
+
+                    if(oldMatches && newDoc.getElementById('matches')) oldMatches.innerHTML = newDoc.getElementById('matches').innerHTML;
+                    if(oldStandings && newDoc.getElementById('standings')) oldStandings.innerHTML = newDoc.getElementById('standings').innerHTML;
+                }
+            } catch (error) { console.log("Đang chờ kết nối lại...", error); }
+        }, 10000);
+
+        $(document).ready(function () {
+            $('.ajax-approve-form').on('submit', function (e) {
+                e.preventDefault();
+                const form = $(this);
+                const teamId = form.data('teamid');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    method: 'POST',
+                    data: form.serialize(),
+                    success: function (res) {
+                        $(`#request-row-${teamId}`).fadeOut(300, function() {
+                            $(this).remove();
+                            updateRequestBadge();
+                        });
+                    }
+                });
+            });
+
+            $('.ajax-reject-form').on('submit', function (e) {
+                e.preventDefault();
+                if (!confirm('Bạn có chắc chắn muốn từ chối đội này?')) return;
+                const form = $(this);
+                const teamId = form.data('teamid');
+
+                $.ajax({
+                    url: form.attr('action'),
+                    method: 'POST',
+                    data: form.serialize(),
+                    success: function (res) {
+                        $(`#request-row-${teamId}`).fadeOut(300, function() {
+                            $(this).remove();
+                            updateRequestBadge();
+                        });
+                    }
+                });
+            });
+
+            function updateRequestBadge() {
+                let badge = $('#requests-tab span.badge');
+                let currentCount = parseInt(badge.text());
+                if (currentCount > 1) {
+                    badge.text(currentCount - 1);
+                } else {
+                    badge.hide();
+                    $('#requests tbody').html('<tr><td colspan="3" class="text-center text-muted py-4">Không có yêu cầu nào đang chờ.</td></tr>');
+                }
+            }
+        });
+    </script>
+}

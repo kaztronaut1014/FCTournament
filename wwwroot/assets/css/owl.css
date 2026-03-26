@@ -1,0 +1,161 @@
+/**
+ * Owl Carousel v2.3.4 - Fixed, Optimized & Styled for Soccer Project
+ * Includes: Smooth Cross-fade, Border Radius, Box Shadow & No Navigation
+ */
+
+/* ==========================================================================
+   Part 1: Owl Carousel Core Styles (Fixed for Smoothness)
+   ========================================================================== */
+.owl-carousel {
+  display: none;
+  width: 100%;
+  -webkit-tap-highlight-color: transparent;
+  position: relative;
+  z-index: 1; 
+}
+
+.owl-carousel .owl-stage {
+  position: relative;
+  -ms-touch-action: pan-Y;
+  touch-action: manipulation;
+  -webkit-font-smoothing: antialiased;
+}
+
+.owl-carousel .owl-stage:after {
+  content: ".";
+  display: block;
+  clear: both;
+  visibility: hidden;
+  line-height: 0;
+  height: 0; 
+}
+
+.owl-carousel .owl-stage-outer {
+  position: relative;
+  overflow: hidden;
+  /* Ép trình duyệt dùng card đồ họa để render 3D cho mượt */
+  -webkit-transform: translate3d(0px, 0px, 0px); 
+  transform: translate3d(0px, 0px, 0px);
+}
+
+.owl-carousel .owl-item {
+  position: relative;
+  min-height: 1px;
+  float: left;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+.owl-banner .item img {
+    /* Bo góc kiểu "Nửa kín nửa hở" */
+    border-top-left-radius: 40px;
+    border-bottom-left-radius: 40px;
+    border-top-right-radius: 0px;
+    border-bottom-right-radius: 0px;
+    
+    height: 600px; /* Làm ảnh thật cao lên */
+    width: 110% !important; /* Ép ảnh rộng hơn một chút */
+    margin-right: -15px; /* Đẩy hẳn nó ra mép màn hình */
+}
+
+.owl-carousel.owl-loaded { display: block; }
+
+/* --- Plugin: Animate (Smooth timing) --- */
+.owl-carousel .animated {
+  /* Tăng lên 1200ms để tạo độ trễ mượt mà */
+  animation-duration: 1200ms !important; 
+  animation-fill-mode: both; 
+}
+
+/* ==========================================================================
+   Part 2: Custom Styles for Banner Slider (Bo Góc & Bóng Đổ)
+   ========================================================================== */
+
+/* Ép ảnh mượt bằng Hardware Acceleration */
+.owl-banner .item img {
+    width: 100% !important;
+    height: 480px;          /* Độ cao lý tưởng cho layout col-lg-5 */
+    object-fit: cover;
+    
+    /* STYLE CHÍNH BẠN YÊU CẦU: */
+    border-radius: 23px;    /* Bo góc 4 cạnh cho đẹp */
+    box-shadow: 0px 15px 35px rgba(0,0,0,0.25); /* Bóng đổ đổ sâu và êm */
+    
+    /* Chống nháy hình khi chuyển cảnh */
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0); 
+    will-change: opacity, transform;
+}
+
+/* --- Hiệu ứng Cross-fade song song chuẩn --- */
+.owl-carousel .fadeOut {
+    animation-name: smoothFadeOut !important;
+}
+
+.owl-carousel .fadeIn {
+    animation-name: smoothFadeIn !important;
+}
+
+/* Keyframes để tạo hiệu ứng "chiều sâu" khi đổi ảnh */
+@keyframes smoothFadeOut {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.05); } /* Ảnh cũ hơi to ra khi biến mất */
+}
+
+@keyframes smoothFadeIn {
+    0% { opacity: 0; transform: scale(0.95); } /* Ảnh mới hơi nhỏ lại khi xuất hiện */
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================================================
+   Part 3: Căn giữa Logo Giải đấu (Fixed in Trending Section)
+   ========================================================================== */
+
+/* 1. Căn giữa khung chứa (Thẻ Thumb) */
+.trending .item .thumb {
+    height: 250px; /* Chiều cao cố định cho tất cả các ô */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff; /* Màu nền trắng cho đồng bộ */
+    border-radius: 23px;
+    overflow: hidden;
+    padding: 30px; /* Tạo khoảng trống để logo không chạm mép */
+}
+
+/* 2. Căn giữa thẻ <a> bên trong (nếu có) */
+.trending .item .thumb a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+/* 3. Xử lý logo - QUAN TRỌNG NHẤT */
+.trending .item .thumb img {
+    width: auto !important;     /* Bỏ ép rộng 100% */
+    max-width: 100% !important;  /* Không cho vượt quá khung */
+    max-height: 100% !important; /* Không cho vượt quá chiều cao */
+    object-fit: contain;        /* Giữ nguyên tỉ lệ logo */
+    margin: 0 auto;             /* Căn giữa dự phòng */
+}
+
+/* ==========================================================================
+   Part 4: Cleanup (Hide Navigation & Dots)
+   ========================================================================== */
+.owl-nav, 
+.owl-dots {
+    display: none !important;
+}
+/* Ép slide rộng ra sát lề phải màn hình */
+@media (min-width: 992px) {
+    .main-banner .row {
+        align-items: center; /* Căn giữa ảnh theo chiều dọc với phần chữ */
+    }
+    .main-banner .col-lg-5 {
+        padding-right: 0; /* Xóa khoảng trắng bên phải */
+    }
+}

@@ -1,0 +1,270 @@
+﻿@model FCTournament.Models.Team
+@{
+    ViewData["Title"] = "Quản lý đội bóng: " + Model.FullName;
+}
+
+<style>
+    /* Ẩn input file mặc định */
+    input[type="file"] {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        width: 0 !important;
+        height: 0 !important;
+        position: absolute !important;
+    }
+
+    /* Style cho danh sách cầu thủ */
+    .player-list-item {
+        background: #fff;
+        border-radius: 15px;
+        padding: 15px;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+        border: 1px solid #f0f0f0;
+        transition: 0.3s;
+    }
+
+        .player-list-item:hover {
+            transform: translateX(5px);
+            border-color: #008af8;
+        }
+</style>
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Quản Lý Đội Bóng</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > <a asp-action="Index">Đội bóng</a> > @Model.ShortName</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section py-5" style="background-color: #fcfcfc;">
+    <div class="container">
+        <div class="row g-5">
+
+            <div class="col-lg-5">
+                <div class="section-heading mb-4 text-start">
+                    <h6>HỒ SƠ</h6>
+                    <h2 style="font-size: 28px;">Thông tin chung</h2>
+                </div>
+
+                <form asp-action="Edit" method="post" enctype="multipart/form-data" class="p-4" style="background: #fff; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08);">
+                    <input type="hidden" asp-for="Id" />
+                    <input type="hidden" asp-for="Logo" />
+                    <input type="hidden" asp-for="ApplicationUserId" />
+                    <input type="hidden" asp-for="ManagerId" />
+                    <input type="hidden" asp-for="EstablishDate" />
+
+                    <div class="text-center mb-4">
+                        <div style="position: relative; display: inline-block; cursor: pointer; width: 120px; height: 120px;" onclick="document.getElementById('teamLogoInput').click();">
+                            <img src="@(string.IsNullOrEmpty(Model.Logo) ? $"https://ui-avatars.com/api/?name={Model.ShortName}&background=random&color=fff&size=120" : Model.Logo)" id="imagePreview" style="width: 120px; height: 120px; border-radius: 50%; border: 4px solid #eee; object-fit: cover;">
+                            <div style="position: absolute; bottom: 0; right: 0; background: #008af8; color: #fff; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 3px solid #fff;">
+                                <i class="fa fa-camera"></i>
+                            </div>
+                            <input type="file" id="teamLogoInput" name="logoFile" accept="image/*" onchange="previewLogo(this)">
+                        </div>
+                    </div>
+
+                    <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted">Tên câu lạc bộ</label>
+                        <input asp-for="FullName" class="form-control" style="border-radius: 12px; background: #f9f9f9;" required>
+                        <span asp-validation-for="FullName" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted">Viết tắt</label>
+                        <input asp-for="ShortName" class="form-control" maxlength="4" style="border-radius: 12px; background: #f9f9f9; text-transform: uppercase;" required>
+                        <span asp-validation-for="ShortName" class="text-danger"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-muted">Khu vực</label>
+                        <select asp-for="LocationId" asp-items="ViewBag.LocationId" class="form-select" style="border-radius: 12px; background: #f9f9f9;" required></select>
+                        <span asp-validation-for="LocationId" class="text-danger"></span>
+                    </div>
+
+                    <div class="d-flex flex-column gap-2 mt-4">
+                        <button type="submit" class="btn py-3 fw-bold" style="background-color: #008af8; color: white; border-radius: 15px;">
+                            <i class="fa fa-save me-2"></i> Lưu Thay Đổi
+                        </button>
+
+                        <button type="submit" form="deleteTeamForm" class="btn py-3 fw-bold" style="background-color: #fff; color: #ee626b; border: 1px solid #ee626b; border-radius: 15px;" onclick="return confirm('⚠️ Bạn có chắc chắn muốn GIẢI TÁN đội bóng này không? Mọi dữ liệu sẽ bị xóa!');">
+                            <i class="fa fa-trash me-2"></i> Giải Tán Đội Bóng
+                        </button>
+                    </div>
+                </form>
+
+                <form id="deleteTeamForm" asp-action="Delete" asp-route-id="@Model.Id" method="post" style="display: none;"></form>
+            </div>
+
+
+            <div class="col-lg-7">
+                <div class="section-heading mb-4 text-start">
+                    <h6>SQUAD</h6>
+                    <h2 style="font-size: 28px;">Đội hình thi đấu</h2>
+                </div>
+
+                <div class="squad-list p-4" style="background: #fff; border-radius: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); min-height: 500px;">
+
+                    <div class="mb-4 text-center p-3" style="background: #fcfcfc; border-radius: 15px; border: 1px dashed #ccc;">
+                        <button type="button" class="btn px-4 py-2 fw-bold" data-bs-toggle="modal" data-bs-target="#invitePlayerModal" style="background-color: #008af8; color: white; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,138,248,0.3);">
+                            <i class="fa fa-search me-2"></i> Tìm kiếm & Chiêu mộ Cầu thủ
+                        </button>
+                    </div>
+
+                    <div class="modal fade" id="invitePlayerModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content" style="border-radius: 20px; border: none;">
+                                <div class="modal-header" style="border-bottom: 1px solid #eee;">
+                                    <h5 class="modal-title fw-bold">Chiêu mộ Cầu thủ</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body p-4 bg-light">
+                                    <div class="input-group mb-4" style="box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-radius: 15px; overflow: hidden;">
+                                        <span class="input-group-text bg-white border-0 text-muted"><i class="fa fa-search"></i></span>
+                                        <input type="text" id="searchInput" class="form-control border-0 py-3" placeholder="Nhập Nickname hoặc Tên cầu thủ...">
+                                    </div>
+
+                                    <div id="searchResults" class="d-flex flex-column gap-2">
+                                        <div class="text-center text-muted py-4">
+                                            <i class="fa fa-keyboard fa-2x mb-2 opacity-50"></i>
+                                            <p class="m-0" style="font-size: 14px;">Gõ để bắt đầu tìm kiếm...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    @if (Model.Players != null && Model.Players.Any())
+                    {
+                        foreach (var player in Model.Players)
+                        {
+                            // Logic fallback tên và tính tuổi bằng C# ngay trong View
+                            string displayName = player.NickName;
+                            if (string.IsNullOrWhiteSpace(displayName)) displayName = player.User?.FullName;
+                            if (string.IsNullOrWhiteSpace(displayName)) displayName = "Người chơi ẩn danh";
+
+                            <div class="player-list-item">
+                                <div class="d-flex align-items-center">
+                                    <img src="https://ui-avatars.com/api/?name=@displayName&background=random&color=fff&size=50" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; margin-right: 15px; border: 2px solid #ddd;">
+                                    <div>
+                                        <h5 class="fw-bold m-0" style="color: #222; font-size: 16px;">@displayName</h5>
+                                    </div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <form asp-action="RemovePlayer" method="post" onsubmit="return confirm('Bạn có chắc chắn muốn đuổi @displayName khỏi đội?');">
+                                        <input type="hidden" name="teamId" value="@Model.Id" />
+                                        <input type="hidden" name="playerId" value="@player.Id" />
+                                        <button type="submit" class="btn btn-sm" style="background: #ffeeee; color: #ee626b; border-radius: 10px; font-weight: bold;" title="Khai trừ khỏi đội">
+                                            <i class="fa fa-user-minus"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <img src="https://ui-avatars.com/api/?name=Empty&background=f7f7f7&color=ccc&size=100" style="width: 100px; margin-bottom: 20px; border-radius: 50%;">
+                            <h5 class="text-muted fw-bold">Đội hình đang trống</h5>
+                            <p class="text-muted" style="font-size: 14px;">Nhập Nickname của các Player ở khung trên để mời vào đội nhé!</p>
+                        </div>
+                    }
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        function previewLogo(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) { document.getElementById('imagePreview').src = e.target.result; }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+        document.getElementById('ShortName').addEventListener('input', function(e) {
+            e.target.value = e.target.value.toUpperCase();
+        });
+        // XỬ LÝ TÌM KIẾM CẦU THỦ TRỰC TIẾP
+        let searchTimeout = null;
+        const searchInput = document.getElementById('searchInput');
+        const searchResults = document.getElementById('searchResults');
+        const currentTeamId = @Model.Id;
+
+        searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
+            const term = e.target.value.trim();
+
+            if (term.length < 2) {
+                searchResults.innerHTML = '<div class="text-center text-muted py-4"><p class="m-0" style="font-size: 14px;">Nhập ít nhất 2 ký tự...</p></div>';
+                return;
+            }
+
+            searchResults.innerHTML = '<div class="text-center py-4"><i class="fa fa-spinner fa-spin text-primary fa-2x"></i></div>';
+
+            // Đợi 0.5s sau khi ngưng gõ mới gọi API (Chống sập server)
+            searchTimeout = setTimeout(() => {
+                fetch(`/Team/SearchPlayers?term=${encodeURIComponent(term)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        searchResults.innerHTML = '';
+                        if (data.length === 0) {
+                            searchResults.innerHTML = '<div class="text-center text-danger py-4"><p class="m-0">Không tìm thấy cầu thủ nào!</p></div>';
+                            return;
+                        }
+
+                        // Vẽ danh sách kết quả
+                        data.forEach(player => {
+                            const isAvailable = player.isAvailable;
+                            const statusBadge = isAvailable
+                                ? `<span class="badge bg-success" style="font-size: 11px;">Tự do</span>`
+                                : `<span class="badge bg-secondary" style="font-size: 11px;">Đang đá cho: ${player.teamName}</span>`;
+
+                            const actionForm = isAvailable
+                                ? `
+                                <form action="/Team/AddPlayer" method="post">
+                                    <input type="hidden" name="teamId" value="${currentTeamId}" />
+                                    <input type="hidden" name="playerId" value="${player.id}" />
+                                    <button type="submit" class="btn btn-sm text-white px-3" style="background-color: #ee626b; border-radius: 10px;">Mời</button>
+                                </form>
+                                `
+                                : `<button class="btn btn-sm btn-light px-3 text-muted" style="border-radius: 10px;" disabled>Đã có đội</button>`;
+
+                            const itemHtml = `
+                                <div class="bg-white p-3 d-flex justify-content-between align-items-center" style="border-radius: 12px; border: 1px solid #eee;">
+                                    <div class="d-flex align-items-center">
+                                        <img src="https://ui-avatars.com/api/?name=${player.nickName}&background=random&color=fff&size=40" style="border-radius: 50%; margin-right: 12px;">
+                                        <div>
+                                            <h6 class="m-0 fw-bold" style="font-size: 15px;">${player.nickName}</h6>
+                                            ${statusBadge}
+                                        </div>
+                                    </div>
+                                    ${actionForm}
+                                </div>
+                            `;
+                            searchResults.insertAdjacentHTML('beforeend', itemHtml);
+                        });
+                    })
+                    .catch(error => {
+                        searchResults.innerHTML = '<div class="text-center text-danger py-4"><p class="m-0">Lỗi kết nối!</p></div>';
+                    });
+            }, 500);
+        });
+    </script>
+}

@@ -1,0 +1,56 @@
+﻿@page
+@model LogoutModel
+@{
+    ViewData["Title"] = "Đăng xuất";
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Đăng xuất</h3>
+                <span class="breadcrumb"><a href="/">Trang chủ</a> > Đăng xuất</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section contact-us">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="contact-form text-center" style="background-color: #f7f7f7; padding: 50px 40px; border-radius: 25px;">
+
+                    @{
+                        // Trạng thái 1: Người dùng gõ trực tiếp URL /Logout (Chưa bị văng ra)
+                        if (User.Identity?.IsAuthenticated ?? false)
+                        {
+                            <div class="section-heading mb-4 text-center">
+                                <h6>XÁC NHẬN</h6>
+                                <h2>Bạn muốn đăng xuất?</h2>
+                            </div>
+                            <form class="form-inline d-flex justify-content-center" asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Page("/", new { area = "" })" method="post">
+                                <button type="submit" class="btn" style="background-color: #ee626b; color: #fff; border: none; padding: 12px 40px; border-radius: 25px; font-weight: bold; text-transform: uppercase; transition: 0.3s;">
+                                    Xác nhận Đăng xuất
+                                </button>
+                            </form>
+                        }
+                        // Trạng thái 2: Đã đăng xuất thành công
+                        else
+                        {
+                            <div class="section-heading mb-4 text-center">
+                                <h6>THÀNH CÔNG</h6>
+                                <h2>Đã đăng xuất!</h2>
+                            </div>
+                            <p class="mb-4" style="font-size: 16px; color: #666;">Bạn đã đăng xuất khỏi hệ thống FC Tournament an toàn.</p>
+                            <a href="/" class="btn" style="background-color: #008af8; color: #fff; border: none; padding: 12px 40px; border-radius: 25px; font-weight: bold; text-transform: uppercase; transition: 0.3s; text-decoration: none;">
+                                Về Trang chủ
+                            </a>
+                        }
+                    }
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
