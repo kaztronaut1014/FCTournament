@@ -72,6 +72,11 @@ namespace FCTournament.Controllers
         {
             var tournament = await _tournamentRepo.GetTournamentByIdAsync(id);
             if (tournament == null || tournament.IsDeleted) return NotFound();
+            if (tournament.StartDate <= DateOnly.FromDateTime(DateTime.Now) && !tournament.IsStarted)
+            {
+                tournament.IsStarted = true;
+                await _tournamentRepo.UpdateTournamentAsync(tournament);
+            }
             return View(tournament);
         }
 
