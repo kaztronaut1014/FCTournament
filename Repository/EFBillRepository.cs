@@ -12,6 +12,14 @@ namespace FCTournament.Repository
             _context = context;
         }
 
+        public async Task<Bill> GetBillByIdAsync(int billId)
+        {
+            return await _context.Bills
+                .Include(b => b.Tournament)
+                .Include(b => b.Team)
+                .FirstOrDefaultAsync(b => b.Id == billId);
+        }
+
         public async Task AddBillAsync(Bill bill)
         {
             _context.Bills.Add(bill);
@@ -44,6 +52,18 @@ namespace FCTournament.Repository
                 bill.isPaid = true;
                 await _context.SaveChangesAsync();
             }
+        }
+
+        public async Task<IEnumerable<Bill>> GetBillsByUserIdAsync(string userId)
+        {
+            // Lấy các hóa đơn thuộc về đội bóng do User này quản lý
+            // (Lưu ý: Nếu Model Team của bạn dùng khóa ngoại tên khác, hãy sửa lại đoạn b.Team.ApplicationUserId cho đúng nhé)
+            return await _context.Bills
+                .Include(b => b.Tournament)
+                .Include(b => b.Team)
+                .Where(b => b.Team.ApplicationUserId == userId)
+                .OrderByDescending(b => b.DateCreate)
+                .ToListAsync();
         }
     }
 }

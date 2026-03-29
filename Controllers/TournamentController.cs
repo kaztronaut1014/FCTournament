@@ -29,6 +29,8 @@ namespace FCTournament.Controllers
         private readonly IMatchRepository _matchRepo;
         private readonly EFOrganizerRepository _organizerRepo;
         private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IBillRepository _billRepo;
+        private readonly IBillDetailsRepository _billDetailsRepo;
 
         public TournamentController(
             ITournamentRepository tournamentRepo,
@@ -40,7 +42,9 @@ namespace FCTournament.Controllers
             IWebHostEnvironment webHostEnvironment,
             ITournamentTeamRepository tournamentTeamRepo,
             UserManager<ApplicationUser> userManager,
-            EFOrganizerRepository organizerRepo)
+            EFOrganizerRepository organizerRepo,
+            IBillRepository billRepo,
+            IBillDetailsRepository billDetailsRepo)
         {
             _tournamentRepo = tournamentRepo;
             _locationRepo = locationRepo;
@@ -52,6 +56,8 @@ namespace FCTournament.Controllers
             _userManager = userManager;
             _organizerRepo = organizerRepo;
             _teamRepo = teamRepo;
+            _billRepo = billRepo;
+            _billDetailsRepo = billDetailsRepo;
         }
 
         [AllowAnonymous]
@@ -316,6 +322,27 @@ namespace FCTournament.Controllers
             var tournament = await _tournamentRepo.GetTournamentByIdAsync(tournamentId);
 
             if (tournament == null || tournament.ApplicationUserId != userId) return Forbid();
+
+            if (tournament.TournamentTeams.Count(t => !tournament.needApproved || t.IsApproved) > tournament.Size)
+            {
+                TempData["ErrorMessage"] = "❌ Không thể phê duyệt! Giải đấu đã đủ số lượng đội tham gia.";
+                return RedirectToAction("Details", new { id = tournamentId });
+            }
+
+            if (tournament.Fees > 0)
+            {
+                // A. TẠO HÓA ĐƠN CHÍNH (BILL)
+                var bill = new Bill
+                {
+                    TournamentId = tournamentId,
+                    TeamId = teamId,
+                    Fee = tournament.Fees, // Tổng tiền
+                    isPaid = false,
+                    DateCreate = DateTime.Now
+                };
+                await _billRepo.AddBillAsync(bill);
+
+            }
 
             await _tournamentTeamRepo.ApproveTeamAsync(tournamentId, teamId);
 
@@ -709,6 +736,78 @@ namespace FCTournament.Controllers
             }
 
             TempData["SuccessMessage"] = $"✅ Đã bốc thăm thành công {matchesCreated} trận đấu cho VÒNG TIẾP THEO!";
+            return RedirectToAction("Details", new { id = tournamentId });
+        }
+
+        [Authorize]
+        public async Task<IActionResult> Checkout(int tournamentId, int teamId)
+        {
+            var tournament = await _tournamentRepo.GetTournamentByIdAsync(tournamentId);
+            var team = await _teamRepo.GetTeamByIdAsync(teamId);
+
+            if (tournament == null || team == null) return NotFound();
+
+            // Nếu giải miễn phí -> Bỏ qua thanh toán, gọi thẳng hàm RegisterTeam cũ
+            if (tournament.Fees <= 0 || tournament.needApproved)
+            {
+                return await RegisterTeam(tournamentId, teamId);
+            }
+
+            ViewBag.TeamId = teamId;
+            ViewBag.TeamName = team.FullName;
+
+            return View(tournament);
+        }
+
+        [HttpPost]
+        [Authorize]
+        public async Task<IActionResult> ProcessPayment(int tournamentId, int teamId)
+        {
+            var userId = _userManager.GetUserId(User);
+            var tournament = await _tournamentRepo.GetTournamentByIdAsync(tournamentId);
+            var team = await _teamRepo.GetTeamByIdAsync(teamId);
+
+            // ... (Các bước kiểm tra giải đầy, đã khởi tranh tương tự hàm RegisterTeam) ...
+            if (tournament.TournamentTeams.Count(t => !tournament.needApproved || t.IsApproved) >= tournament.Size)
+            {
+                TempData["ErrorMessage"] = "❌ Giải đấu đã đủ số lượng đội tham gia!";
+                return RedirectToAction("Details", new { id = tournamentId });
+            }
+
+            // A. TẠO HÓA ĐƠN CHÍNH (BILL)
+            var bill = new Bill
+            {
+                TournamentId = tournamentId,
+                TeamId = teamId,
+                Fee = tournament.Fees, // Tổng tiền
+                isPaid = false,        // Mới trả 50% nên chưa hoàn tất
+                DateCreate = DateTime.Now
+            };
+            await _billRepo.AddBillAsync(bill);
+
+            // B. TẠO LỊCH SỬ THANH TOÁN CỌC 50% (BILL DETAILS)
+            var depositAmount = tournament.Fees / 2; // Tính 50%
+            var billDetail = new BillDetails
+            {
+                BillId = bill.Id,
+                FeePaid = depositAmount,
+                DatePay = DateTime.Now
+            };
+            await _billDetailsRepo.AddAsync(billDetail);
+
+            // C. LƯU ĐỘI VÀO GIẢI ĐẤU
+            var tournamentTeam = new TournamentTeam
+            {
+                TournamentId = tournamentId,
+                TeamId = teamId,
+                IsApproved = !tournament.needApproved
+            };
+            await _tournamentTeamRepo.AddTournamentTeamAsync(tournamentTeam);
+
+            team.inTournament += 1;
+            await _teamRepo.UpdateTeamAsync(team);
+
+            TempData["SuccessMessage"] = $"Đã thanh toán thành công {depositAmount:N0} VNĐ (50% cọc). Đội bóng đã được ghi danh!";
             return RedirectToAction("Details", new { id = tournamentId });
         }
     }

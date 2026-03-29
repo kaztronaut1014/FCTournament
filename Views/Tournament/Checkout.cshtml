@@ -1,0 +1,67 @@
+﻿@model FCTournament.Models.Tournament
+@{
+    ViewData["Title"] = "Thanh toán lệ phí";
+    float deposit = Model.Fees / 2;
+    float remaining = Model.Fees - deposit;
+}
+
+<div class="page-heading header-text">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-12">
+                <h3>Xác nhận thanh toán</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card p-4 shadow-lg" style="border-radius: 20px; border: none;">
+                <h4 class="fw-bold text-center text-primary mb-4">HÓA ĐƠN GHI DANH</h4>
+
+                <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                    <span class="text-muted">Đội bóng:</span>
+                    <span class="fw-bold">@ViewBag.TeamName</span>
+                </div>
+
+                <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                    <span class="text-muted">Giải đấu:</span>
+                    <span class="fw-bold text-end">@Model.Name</span>
+                </div>
+
+                <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
+                    <span class="text-muted">Tổng lệ phí giải:</span>
+                    <span class="fw-bold">@Model.Fees.ToString("N0") VNĐ</span>
+                </div>
+
+                <div class="d-flex justify-content-between mb-3 text-success">
+                    <span class="fw-bold">Cần thanh toán trước (50%):</span>
+                    <span class="fw-bold fs-5">@deposit.ToString("N0") VNĐ</span>
+                </div>
+
+                <div class="d-flex justify-content-between mb-4 text-danger border-bottom pb-2">
+                    <span>Số tiền trả sau (Còn lại):</span>
+                    <span>@remaining.ToString("N0") VNĐ</span>
+                </div>
+
+                <div class="alert alert-warning text-center" style="font-size: 14px; border-radius: 10px;">
+                    <i class="fa fa-info-circle"></i> Bạn cần thanh toán 50% lệ phí để hoàn tất thủ tục ghi danh. 50% còn lại sẽ được thanh toán sau cho Ban tổ chức.
+                </div>
+
+                <form asp-action="ProcessPayment" method="post">
+                    <input type="hidden" name="tournamentId" value="@Model.Id" />
+                    <input type="hidden" name="teamId" value="@ViewBag.TeamId" />
+
+                    <button type="submit" class="btn btn-primary w-100 py-3 fw-bold mt-2" style="border-radius: 15px; font-size: 18px;">
+                        <i class="fa fa-credit-card me-2"></i> Xác nhận thanh toán & Ghi danh
+                    </button>
+                    <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-light w-100 py-2 fw-bold mt-2" style="border-radius: 15px;">
+                        Hủy bỏ
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

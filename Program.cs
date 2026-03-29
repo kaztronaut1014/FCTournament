@@ -33,6 +33,8 @@ builder.Services.AddScoped<ITeamRepository, EFTeamRepository>();
 builder.Services.AddScoped<IPlayerRepository, EFPlayerRepository>();
 builder.Services.AddScoped<ITournamentTeamRepository, EFTournamentTeamRepository>();
 builder.Services.AddScoped<IMatchRepository, EFMatchRepository>();
+builder.Services.AddScoped<IBillRepository, EFBillRepository>();
+builder.Services.AddScoped<IBillDetailsRepository, EFBillDetailsRepository>();
 
 var app = builder.Build();
 

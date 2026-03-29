@@ -60,6 +60,10 @@
             if (orgProfile.SubscriptionId == 3) maxAllowed = 2;
             else if (orgProfile.SubscriptionId == 4) maxAllowed = 4;
         }
+        if (User.IsInRole("Admin"))
+        {
+            maxAllowed = 9999;
+        }
 
         // CHỈ ĐẾM NHỮNG GIẢI ĐANG HOẠT ĐỘNG
         var activeTournamentsCount = organizedTournaments.Count(t => !t.IsFinished);

@@ -29,6 +29,7 @@ namespace FCTournament.Controllers
             ViewBag.TotalTeams = await _context.Teams.CountAsync(t => !t.IsDeleted);
             ViewBag.TotalTournaments = await _context.Tournaments.CountAsync(t => !t.IsDeleted);
             ViewBag.PendingRequests = await _context.Organizers.CountAsync(o => o.PendingSubscriptionId != null);
+            ViewBag.TotalBills = await _context.Bills.CountAsync();
 
             return View();
         }
@@ -196,6 +197,59 @@ namespace FCTournament.Controllers
                 TempData["SuccessMessage"] = $"Đã cập nhật đa quyền ({string.Join(", ", newRoles)}) cho {user.Email}!";
             }
             return RedirectToAction(nameof(Users));
+        }
+
+        // TRANG QUẢN LÝ TOÀN BỘ HÓA ĐƠN CHO ADMIN
+        public async Task<IActionResult> Bills()
+        {
+            var allBills = await _context.Bills
+                .Include(b => b.Tournament)
+                .Include(b => b.Team)
+                .OrderByDescending(b => b.DateCreate)
+                .ToListAsync();
+
+            var paidAmounts = await _context.BillDetails
+                .GroupBy(bd => bd.BillId)
+                .ToDictionaryAsync(g => g.Key, g => g.Sum(bd => bd.FeePaid));
+
+            ViewBag.PaidAmounts = paidAmounts;
+
+            return View(allBills);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> RemoveBill(int billId)
+        {
+            var bill = await _context.Bills
+                .FirstOrDefaultAsync(b => b.Id == billId);
+            if (bill != null)
+            {
+                var relatedDetails = await _context.BillDetails.Where(bd => bd.BillId == billId).ToListAsync();
+                if (relatedDetails.Any())
+                {
+                    _context.BillDetails.RemoveRange(relatedDetails);
+                }
+                _context.Bills.Remove(bill);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Đã xóa hóa đơn!";
+            }
+            return RedirectToAction(nameof(Bills));
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> UpdateBill(int billId)
+        {
+            var existBill = await _context.Bills
+                .FirstOrDefaultAsync(b => b.Id == billId);
+            if (existBill != null)
+            {
+                existBill.isPaid = true;
+                existBill.DatePaid = DateTime.Now;
+                _context.Bills.Update(existBill);
+                await _context.SaveChangesAsync();
+                TempData["SuccessMessage"] = "Đã thanh toán hóa đơn!";
+            }
+            return RedirectToAction(nameof(Bills));
         }
     }
 }

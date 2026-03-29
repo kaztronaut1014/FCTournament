@@ -208,7 +208,7 @@
                         <div class="modal-content" style="border-radius: 20px;">
                             <div class="modal-body p-4">
                                 <h5 class="fw-bold mb-3">Chọn đội bóng thi đấu</h5>
-                                <form asp-controller="Tournament" asp-action="RegisterTeam" method="post">
+                                <form asp-controller="Tournament" asp-action="Checkout" method="post">
                                     <input type="hidden" name="tournamentId" value="@Model.Id" />
                                     <select name="teamId" class="form-select form-select-lg mb-3" style="border-radius: 15px;" required>
                                         <option value="">-- Vui lòng chọn 1 đội --</option>
@@ -217,7 +217,12 @@
                                             <option value="@t.Id">@t.FullName</option>
                                         }
                                     </select>
-                                    <button type="submit" class="btn w-100 py-3 fw-bold btn-primary" style="border-radius: 15px;">Xác nhận Ghi danh</button>
+                                    @if (Model.Fees > 0)
+                                    {
+                                        <button type="submit" class="btn btn-primary">Tiếp tục thanh toán</button>
+                                    } else {
+                                        <button type="submit" class="btn w-100 py-3 fw-bold btn-primary" style="border-radius: 15px;">Xác nhận Ghi danh</button>
+                                    }
                                 </form>
                             </div>
                         </div>
